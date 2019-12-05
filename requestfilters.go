@@ -17,16 +17,16 @@ type RequestFilter interface {
 // http method, accept-encoding header, etc.
 type CommonCaseFilter struct{}
 
+// NewCommonCaseFilter ...
+func NewCommonCaseFilter() *CommonCaseFilter {
+	return &CommonCaseFilter{}
+}
+
 // ShouldCompress implements RequestFilter interface
 func (c *CommonCaseFilter) ShouldCompress(req *http.Request) bool {
-	switch true {
-	case req.Method == http.MethodHead,
-		req.Header.Get("Upgrade") != "",
-		!strings.Contains(req.Header.Get("Accept-Encoding"), "gzip"):
-		return false
-	}
-
-	return true
+	return req.Method != http.MethodHead &&
+		req.Header.Get("Upgrade") == "" &&
+		strings.Contains(req.Header.Get("Accept-Encoding"), "gzip")
 }
 
 // ExtensionFilter judge via the extension in path
@@ -34,6 +34,17 @@ func (c *CommonCaseFilter) ShouldCompress(req *http.Request) bool {
 // Omit this filter if you want to compress all extension.
 type ExtensionFilter struct {
 	Exts Set
+}
+
+// NewExtensionFilter ...
+func NewExtensionFilter(extensions []string) *ExtensionFilter {
+	var exts = make(Set)
+
+	for _, item := range extensions {
+		exts.Add(item)
+	}
+
+	return &ExtensionFilter{Exts: exts}
 }
 
 // ShouldCompress implements RequestFilter interface
@@ -49,11 +60,5 @@ var defaultExtensions = []string{"", ".txt", ".htm", ".html", ".css", ".php", ".
 
 // DefaultExtensionFilter permits
 func DefaultExtensionFilter() *ExtensionFilter {
-	var exts = make(Set)
-
-	for _, item := range defaultExtensions {
-		exts.Add(item)
-	}
-
-	return &ExtensionFilter{Exts: exts}
+	return NewExtensionFilter(defaultExtensions)
 }
