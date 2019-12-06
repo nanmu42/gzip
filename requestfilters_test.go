@@ -35,7 +35,7 @@ func TestCommonCaseFilter_ShouldCompress(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewCommonCaseFilter()
+			c := NewCommonRequestFilter()
 			if got := c.ShouldCompress(tt.req); got != tt.want {
 				t.Errorf("ShouldCompress() = %v, want %v", got, tt.want)
 			}

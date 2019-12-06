@@ -13,17 +13,17 @@ type RequestFilter interface {
 	ShouldCompress(req *http.Request) bool
 }
 
-// CommonCaseFilter judge via common easy criteria like
+// CommonRequestFilter judge via common easy criteria like
 // http method, accept-encoding header, etc.
-type CommonCaseFilter struct{}
+type CommonRequestFilter struct{}
 
-// NewCommonCaseFilter ...
-func NewCommonCaseFilter() *CommonCaseFilter {
-	return &CommonCaseFilter{}
+// NewCommonRequestFilter ...
+func NewCommonRequestFilter() *CommonRequestFilter {
+	return &CommonRequestFilter{}
 }
 
 // ShouldCompress implements RequestFilter interface
-func (c *CommonCaseFilter) ShouldCompress(req *http.Request) bool {
+func (c *CommonRequestFilter) ShouldCompress(req *http.Request) bool {
 	return req.Method != http.MethodHead &&
 		req.Header.Get("Upgrade") == "" &&
 		strings.Contains(req.Header.Get("Accept-Encoding"), "gzip")
