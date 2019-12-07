@@ -14,6 +14,13 @@ type ResponseHeaderFilter interface {
 	ShouldCompress(header http.Header) bool
 }
 
+// interface guards
+var (
+	_ ResponseHeaderFilter = (*ContentLengthFilter)(nil)
+	_ ResponseHeaderFilter = (*SkipCompressedFilter)(nil)
+	_ ResponseHeaderFilter = (*ContentTypeFilter)(nil)
+)
+
 // ContentLengthFilter permits compression when content length
 // is no less than ContentLengthFilter limit.
 //

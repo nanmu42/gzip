@@ -13,6 +13,12 @@ type RequestFilter interface {
 	ShouldCompress(req *http.Request) bool
 }
 
+// interface guards
+var (
+	_ RequestFilter = (*CommonRequestFilter)(nil)
+	_ RequestFilter = (*ExtensionFilter)(nil)
+)
+
 // CommonRequestFilter judge via common easy criteria like
 // http method, accept-encoding header, etc.
 type CommonRequestFilter struct{}
