@@ -1,6 +1,10 @@
 # gzip
 
-Go gzip middleware for gin and net/http
+The missing Go gzip middleware for gin and net/http.
+
+# Status: v0
+
+API not stabilized, things may breaks.
 
 # Reference
 
