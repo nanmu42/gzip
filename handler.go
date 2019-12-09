@@ -74,6 +74,25 @@ func NewHandler(config Config) *Handler {
 	return &handler
 }
 
+var defaultConfig = Config{
+	CompressionLevel: 6,
+	MinContentLength: 256,
+	RequestFilter: []RequestFilter{
+		NewCommonRequestFilter(),
+		DefaultExtensionFilter(),
+	},
+	ResponseHeaderFilter: []ResponseHeaderFilter{
+		NewSkipCompressedFilter(),
+		DefaultContentTypeFilter(),
+	},
+}
+
+// DefaultHandler creates a gzip handler to take care of response compression,
+// with meaningful preset.
+func DefaultHandler() *Handler {
+	return NewHandler(defaultConfig)
+}
+
 func (h *Handler) getGzipWriter() *gzip.Writer {
 	return h.gzipWriterPool.Get().(*gzip.Writer)
 }
@@ -88,14 +107,79 @@ func (h *Handler) putGzipWriter(w *gzip.Writer) {
 	h.gzipWriterPool.Put(w)
 }
 
+type ginGzipWriter struct {
+	*writerWrapper
+	gin.ResponseWriter
+}
+
+var _ gin.ResponseWriter = (*ginGzipWriter)(nil)
+
+// WriteString implements interface gin.ResponseWriter
+func (g *ginGzipWriter) WriteString(s string) (int, error) {
+	return g.writerWrapper.Write([]byte(s))
+}
+
+// Write implements interface gin.ResponseWriter
+func (g *ginGzipWriter) Write(data []byte) (int, error) {
+	return g.writerWrapper.Write(data)
+}
+
+// WriteHeader implements interface gin.ResponseWriter
+func (g *ginGzipWriter) WriteHeader(code int) {
+	g.writerWrapper.WriteHeader(code)
+}
+
+// WriteHeader implements interface gin.ResponseWriter
+func (g *ginGzipWriter) Header() http.Header {
+	return g.writerWrapper.Header()
+}
+
+// Flush implements http.Flusher
+func (g *ginGzipWriter) Flush() {
+	g.writerWrapper.Flush()
+}
+
 // Handle implement gin's middleware
 func (h *Handler) Gin(c *gin.Context) {
-	panic("implement me")
+	var shouldCompress = true
+
+	for _, filter := range h.requestFilter {
+		shouldCompress = filter.ShouldCompress(c.Request)
+		if !shouldCompress {
+			break
+		}
+	}
+
+	if shouldCompress {
+		wrapper := newWriterWrapper(h.responseHeaderFilter, h.minContentLength, c.Writer, h.getGzipWriter, h.putGzipWriter)
+		c.Writer = &ginGzipWriter{
+			ResponseWriter: c.Writer,
+			writerWrapper:  wrapper,
+		}
+		defer wrapper.CleanUp()
+	}
+
+	c.Next()
 }
 
 // ServeHTTP implement http.Handler
 func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic("implement me")
+		var shouldCompress = true
+
+		for _, filter := range h.requestFilter {
+			shouldCompress = filter.ShouldCompress(r)
+			if !shouldCompress {
+				break
+			}
+		}
+
+		if shouldCompress {
+			wrapper := newWriterWrapper(h.responseHeaderFilter, h.minContentLength, w, h.getGzipWriter, h.putGzipWriter)
+			w = wrapper
+			defer wrapper.CleanUp()
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }

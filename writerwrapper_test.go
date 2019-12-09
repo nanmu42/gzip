@@ -131,34 +131,6 @@ func Test_writerWrapper_WriteHeader_filter_yes(t *testing.T) {
 	assert.True(t, wrapper.shouldCompress)
 }
 
-func Test_writerWrapper_WriteHeader_filter_no(t *testing.T) {
-	wrapper, _ := newWrapper(DummyResFilter(false))
-
-	wrapper.WriteHeader(http.StatusOK)
-	assert.False(t, wrapper.shouldCompress)
-}
-
-func Test_writerWrapper_WriteHeader_filter_yes_no_yes(t *testing.T) {
-	wrapper, _ := newWrapper(DummyResFilter(true), DummyResFilter(false), DummyResFilter(true))
-
-	wrapper.WriteHeader(http.StatusOK)
-	assert.False(t, wrapper.shouldCompress)
-}
-
-func Test_writerWrapper_WriteHeader_filter_no_yes_no(t *testing.T) {
-	wrapper, _ := newWrapper(DummyResFilter(false), DummyResFilter(true), DummyResFilter(false))
-
-	wrapper.WriteHeader(http.StatusOK)
-	assert.False(t, wrapper.shouldCompress)
-}
-
-func Test_writerWrapper_WriteHeader_filter_all_yes(t *testing.T) {
-	wrapper, _ := newWrapper(DummyResFilter(true), DummyResFilter(true), DummyResFilter(true))
-
-	wrapper.WriteHeader(http.StatusOK)
-	assert.True(t, wrapper.shouldCompress)
-}
-
 func Test_writerWrapper_Write_after_WriteHeader(t *testing.T) {
 	wrapper, recorder := newWrapper()
 
@@ -190,6 +162,66 @@ func Test_writerWrapper_Write_big(t *testing.T) {
 	body, err := ioutil.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.Equal(t, bigPayload, body)
+}
+
+func Test_writerWrapper_Write_big_all_yes(t *testing.T) {
+	assert.Greater(t, len(bigPayload), minContentLength)
+
+	wrapper, recorder := newWrapper(DummyResFilter(true), DummyResFilter(true), DummyResFilter(true))
+
+	_, err := wrapper.Write(bigPayload)
+	assert.NoError(t, err)
+	wrapper.CleanUp()
+
+	result := recorder.Result()
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.True(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.didFirstWrite)
+
+	reader, err := gzip.NewReader(result.Body)
+	assert.NoError(t, err)
+	body, err := ioutil.ReadAll(reader)
+	assert.NoError(t, err)
+	assert.Equal(t, bigPayload, body)
+}
+
+func Test_writerWrapper_Write_big_filter_yes_no_yes(t *testing.T) {
+	wrapper, recorder := newWrapper(DummyResFilter(true), DummyResFilter(false), DummyResFilter(true))
+
+	_, err := wrapper.Write(bigPayload)
+	assert.NoError(t, err)
+	wrapper.CleanUp()
+
+	result := recorder.Result()
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.False(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.didFirstWrite)
+}
+
+func Test_writerWrapper_Write_big_filter_no_yes_no(t *testing.T) {
+	wrapper, recorder := newWrapper(DummyResFilter(false), DummyResFilter(true), DummyResFilter(false))
+
+	_, err := wrapper.Write(bigPayload)
+	assert.NoError(t, err)
+	wrapper.CleanUp()
+
+	result := recorder.Result()
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.False(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.didFirstWrite)
+}
+
+func Test_writerWrapper_Write_big_filter_all_no(t *testing.T) {
+	wrapper, recorder := newWrapper(DummyResFilter(false), DummyResFilter(false), DummyResFilter(false))
+
+	_, err := wrapper.Write(bigPayload)
+	assert.NoError(t, err)
+	wrapper.CleanUp()
+
+	result := recorder.Result()
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.False(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.didFirstWrite)
 }
 
 func Test_writerWrapper_Write_small(t *testing.T) {

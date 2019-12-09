@@ -67,6 +67,14 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 
+	header := w.Header()
+	for _, filter := range w.Filters {
+		w.shouldCompress = filter.ShouldCompress(header)
+		if !w.shouldCompress {
+			break
+		}
+	}
+
 	// use origin handler directly
 	if !w.shouldCompress {
 		w.flushHeader()
@@ -129,18 +137,6 @@ func (w *writerWrapper) WriteHeader(statusCode int) {
 		statusCode == http.StatusNotModified {
 		w.shouldCompress = false
 		return
-	}
-
-	if len(w.Filters) == 0 {
-		return
-	}
-
-	header := w.Header()
-	for _, filter := range w.Filters {
-		w.shouldCompress = filter.ShouldCompress(header)
-		if !w.shouldCompress {
-			return
-		}
 	}
 }
 
