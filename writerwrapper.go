@@ -1,6 +1,7 @@
 package gzip
 
 import (
+	"compress/gzip"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,16 +11,36 @@ import (
 // to test whether to gzip and gzip the body if applicable.
 type writerWrapper struct {
 	// header filter are applied by its sequence
-	filters []ResponseHeaderFilter
+	Filters []ResponseHeaderFilter
+	// min content length to enable compress
+	MinContentLength int64
+	OriginWriter     http.ResponseWriter
+	// use initGzipWriter() to init gzipWriter when in need
+	GetGzipWriter func() *gzip.Writer
+	// must close gzip writer and put it back to pool
+	PutGzipWriter func(*gzip.Writer)
+
+	// internal below
+
 	// compress or not
+	// default to true
 	shouldCompress bool
+	gzipWriter     *gzip.Writer
 	// is header already flushed?
 	headerFlushed bool
 	didFirstWrite bool
 	statusCode    int
-	// min content length to enable compress
-	minContentLength int64
-	originWriter     http.ResponseWriter
+}
+
+func newWriterWrapper(filters []ResponseHeaderFilter, minContentLength int64, originWriter http.ResponseWriter, getGzipWriter func() *gzip.Writer, putGzipWriter func(*gzip.Writer)) *writerWrapper {
+	return &writerWrapper{
+		shouldCompress:   true,
+		Filters:          filters,
+		MinContentLength: minContentLength,
+		OriginWriter:     originWriter,
+		GetGzipWriter:    getGzipWriter,
+		PutGzipWriter:    putGzipWriter,
+	}
 }
 
 // interface guard
@@ -30,19 +51,14 @@ func (w *writerWrapper) headerWritten() bool {
 	return w.statusCode != 0
 }
 
-func (w *writerWrapper) contentLengthFromHeader() *int64 {
-	cl := w.Header().Get("Content-Length")
-	if cl == "" {
-		return nil
-	}
-
-	length, _ := strconv.ParseInt(cl, 10, 64)
-	return &length
+func (w *writerWrapper) initGzipWriter() {
+	w.gzipWriter = w.GetGzipWriter()
+	w.gzipWriter.Reset(w.OriginWriter)
 }
 
 // Header implements http.ResponseWriter
 func (w *writerWrapper) Header() http.Header {
-	return w.originWriter.Header()
+	return w.OriginWriter.Header()
 }
 
 // Write implements http.ResponseWriter
@@ -54,14 +70,44 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 	// use origin handler directly
 	if !w.shouldCompress {
 		w.flushHeader()
-		return w.originWriter.Write(data)
+		w.didFirstWrite = true
+		return w.OriginWriter.Write(data)
 	}
 
 	if !w.didFirstWrite {
-		// first time to meet data
-		contentLength := w.contentLengthFromHeader()
-		contentType := w.Header().Get("")
+		w.didFirstWrite = true
+		w.shouldCompress = w.enoughContentLength(data)
+		w.flushHeader()
+
+		if w.shouldCompress {
+			w.initGzipWriter()
+		}
 	}
+
+	if w.shouldCompress {
+		return w.gzipWriter.Write(data)
+	}
+
+	return w.OriginWriter.Write(data)
+}
+
+func (w *writerWrapper) enoughContentLength(data []byte) bool {
+	var (
+		header        = w.Header()
+		_, haveCl     = header["Content-Length"]
+		contentLength int64
+	)
+	if haveCl {
+		contentLength, _ = strconv.ParseInt(header.Get("Content-Length"), 10, 64)
+	} else {
+		contentLength = int64(len(data))
+	}
+
+	if contentLength == 0 || contentLength < w.MinContentLength {
+		return false
+	}
+
+	return true
 }
 
 // WriteHeader implements http.ResponseWriter
@@ -85,12 +131,12 @@ func (w *writerWrapper) WriteHeader(statusCode int) {
 		return
 	}
 
-	if len(w.filters) == 0 {
+	if len(w.Filters) == 0 {
 		return
 	}
 
 	header := w.Header()
-	for _, filter := range w.filters {
+	for _, filter := range w.Filters {
 		w.shouldCompress = filter.ShouldCompress(header)
 		if !w.shouldCompress {
 			return
@@ -98,8 +144,9 @@ func (w *writerWrapper) WriteHeader(statusCode int) {
 	}
 }
 
-// flushHeader must always be called and called at last
-// with WriteHeader() and/or Write() already called
+// flushHeader must always be called and called after
+// WriteHeader() is called and
+// w.shouldCompress is decided.
 func (w *writerWrapper) flushHeader() {
 	if w.headerFlushed {
 		return
@@ -108,7 +155,6 @@ func (w *writerWrapper) flushHeader() {
 	// if neither WriteHeader() or Write() are called,
 	// do nothing
 	if !w.headerWritten() {
-		w.headerFlushed = true
 		return
 	}
 
@@ -123,15 +169,28 @@ func (w *writerWrapper) flushHeader() {
 		}
 	}
 
-	w.originWriter.WriteHeader(w.statusCode)
+	w.OriginWriter.WriteHeader(w.statusCode)
 
 	w.headerFlushed = true
 }
 
+// CleanUp flushes header and closed gzip writer
+//
+// Write() and WriteHeader() should not be called
+// after CleanUp()
+func (w *writerWrapper) CleanUp() {
+	w.flushHeader()
+	if w.gzipWriter != nil {
+		w.PutGzipWriter(w.gzipWriter)
+		w.gzipWriter = nil
+	}
+}
+
 // Flush implements http.Flusher
 func (w *writerWrapper) Flush() {
-	w.flushHeader()
-	if flusher, ok := w.originWriter.(http.Flusher); ok {
+	w.CleanUp()
+
+	if flusher, ok := w.OriginWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
 }
