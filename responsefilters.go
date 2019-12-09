@@ -2,7 +2,6 @@ package gzip
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -16,41 +15,9 @@ type ResponseHeaderFilter interface {
 
 // interface guards
 var (
-	_ ResponseHeaderFilter = (*ContentLengthFilter)(nil)
 	_ ResponseHeaderFilter = (*SkipCompressedFilter)(nil)
 	_ ResponseHeaderFilter = (*ContentTypeFilter)(nil)
 )
-
-// ContentLengthFilter permits compression when content length
-// is no less than ContentLengthFilter limit.
-//
-// The unit is byte.
-type ContentLengthFilter int64
-
-// NewContentLengthFilter ...
-func NewContentLengthFilter(min int64) ContentLengthFilter {
-	return ContentLengthFilter(min)
-}
-
-// ShouldCompress implements ResponseHeaderFilter interface
-func (c ContentLengthFilter) ShouldCompress(header http.Header) bool {
-	var cl = header.Get("Content-Length")
-	if cl == "" {
-		// no content-length provided
-		return true
-	}
-
-	length, _ := strconv.ParseInt(cl, 10, 64)
-	if length == 0 {
-		return false
-	}
-
-	if length < int64(c) {
-		return false
-	}
-
-	return true
-}
 
 // SkipCompressedFilter judges whether content has been
 // already compressed
@@ -72,24 +39,37 @@ func (s *SkipCompressedFilter) ShouldCompress(header http.Header) bool {
 //
 // Omit this filter if you want to compress all content type.
 type ContentTypeFilter struct {
-	Types Set
+	Types      Set
+	AllowEmpty bool
 }
 
 // NewContentTypeFilter ...
 func NewContentTypeFilter(types []string) *ContentTypeFilter {
-	var set = make(Set)
+	var (
+		set        = make(Set)
+		allowEmpty bool
+	)
 
 	for _, item := range types {
+		if item == "" {
+			allowEmpty = true
+			continue
+		}
 		set.Add(item)
 	}
 
-	return &ContentTypeFilter{Types: set}
+	return &ContentTypeFilter{Types: set, AllowEmpty: allowEmpty}
 }
 
 // ShouldCompress implements RequestFilter interface
 // TODO: optimize with ahocorasick
 func (e *ContentTypeFilter) ShouldCompress(header http.Header) bool {
 	contentType := header.Get("Content-Type")
+
+	if contentType == "" {
+		return e.AllowEmpty
+	}
+
 	return e.Types.ContainsFunc(func(s string) bool {
 		return strings.Contains(contentType, s)
 	})

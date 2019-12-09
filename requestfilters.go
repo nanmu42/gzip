@@ -39,23 +39,35 @@ func (c *CommonRequestFilter) ShouldCompress(req *http.Request) bool {
 //
 // Omit this filter if you want to compress all extension.
 type ExtensionFilter struct {
-	Exts Set
+	Exts       Set
+	AllowEmpty bool
 }
 
 // NewExtensionFilter ...
 func NewExtensionFilter(extensions []string) *ExtensionFilter {
-	var exts = make(Set)
+	var (
+		exts       = make(Set)
+		allowEmpty bool
+	)
 
 	for _, item := range extensions {
+		if item == "" {
+			allowEmpty = true
+			continue
+		}
 		exts.Add(item)
 	}
 
-	return &ExtensionFilter{Exts: exts}
+	return &ExtensionFilter{Exts: exts, AllowEmpty: allowEmpty}
 }
 
 // ShouldCompress implements RequestFilter interface
 func (e *ExtensionFilter) ShouldCompress(req *http.Request) bool {
-	return e.Exts.Contains(path.Ext(req.URL.Path))
+	ext := path.Ext(req.URL.Path)
+	if ext == "" {
+		return e.AllowEmpty
+	}
+	return e.Exts.Contains(ext)
 }
 
 // defaultExtensions is the list of default extensions for which to enable gzip.
