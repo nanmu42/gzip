@@ -113,11 +113,10 @@ API可能会在未来变更。代码也许会爆炸。
 
 # License
 
+```
 MIT License
-
 Copyright (c) 2019 LI Zhennan
 
-
 Caddy is licensed under the Apache License
-
 Copyright 2015 Light Code Labs, LLC
+```
