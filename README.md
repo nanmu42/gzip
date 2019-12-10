@@ -115,7 +115,10 @@ During the development of this work, the author took following works/materials a
 # License
 
 MIT License
+
 Copyright (c) 2019 LI Zhennan
 
+
 Caddy is licensed under the Apache License
+
 Copyright 2015 Light Code Labs, LLC
