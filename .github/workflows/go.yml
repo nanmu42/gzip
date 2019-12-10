@@ -19,10 +19,8 @@ jobs:
     - name: Get dependencies
       run: go get
 
-    - name: GolangCI-Lint Action
-      uses: actions-contrib/golangci-lint@v0.1.0
-      with:
-        args: run --enable=golint --disable=deadcode,unused ./...
+    - name: GolangCI-Lint
+      run:  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.21.0 && golangci-lint run --enable=golint --disable=deadcode,unused ./...
 
     - name: Test
       run: go test ./...
