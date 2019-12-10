@@ -1,4 +1,4 @@
-[English]((https://github.com/nanmu42/gzip/blob/master/README.md)) | **中文**
+[English](https://github.com/nanmu42/gzip/blob/master/README.md) | **中文**
 
 # gzip
 
