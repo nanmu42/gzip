@@ -139,7 +139,7 @@ func (g *ginGzipWriter) Flush() {
 	g.writerWrapper.Flush()
 }
 
-// Handle implement gin's middleware
+// Gin implement gin's middleware
 func (h *Handler) Gin(c *gin.Context) {
 	var shouldCompress = true
 
@@ -162,7 +162,7 @@ func (h *Handler) Gin(c *gin.Context) {
 	c.Next()
 }
 
-// ServeHTTP implement http.Handler
+// WrapHandler wraps a http.Handler, returning its gzip-enabled version
 func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var shouldCompress = true

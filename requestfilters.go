@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// filter decide whether or not to compress response judging by request
+// RequestFilter decide whether or not to compress response judging by request
 type RequestFilter interface {
 	// ShouldCompress decide whether or not to compress response,
 	// judging by request

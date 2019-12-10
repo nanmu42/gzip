@@ -1,3 +1,9 @@
+# Command
+
+```bash
+go test -benchmem -bench .
+```
+
 # v0.1.0
 
 ```

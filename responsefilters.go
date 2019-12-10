@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// filter decide whether or not to compress response
+// ResponseHeaderFilter decide whether or not to compress response
 // judging by response header
 type ResponseHeaderFilter interface {
 	// ShouldCompress decide whether or not to compress response,
