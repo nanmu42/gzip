@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"path"
 	"strings"
+
+	"github.com/signalsciences/ac/acascii"
 )
 
 // RequestFilter decide whether or not to compress response judging by request
@@ -39,14 +41,14 @@ func (c *CommonRequestFilter) ShouldCompress(req *http.Request) bool {
 //
 // Omit this filter if you want to compress all extension.
 type ExtensionFilter struct {
-	Exts       Set
+	Exts       *acascii.Matcher
 	AllowEmpty bool
 }
 
-// NewExtensionFilter ...
+// NewExtensionFilter returns a extension or panics
 func NewExtensionFilter(extensions []string) *ExtensionFilter {
 	var (
-		exts       = make(Set)
+		exts       = make([]string, 0, len(extensions))
 		allowEmpty bool
 	)
 
@@ -55,10 +57,13 @@ func NewExtensionFilter(extensions []string) *ExtensionFilter {
 			allowEmpty = true
 			continue
 		}
-		exts.Add(item)
+		exts = append(exts, item)
 	}
 
-	return &ExtensionFilter{Exts: exts, AllowEmpty: allowEmpty}
+	return &ExtensionFilter{
+		Exts:       acascii.MustCompileString(exts),
+		AllowEmpty: allowEmpty,
+	}
 }
 
 // ShouldCompress implements RequestFilter interface
@@ -67,7 +72,7 @@ func (e *ExtensionFilter) ShouldCompress(req *http.Request) bool {
 	if ext == "" {
 		return e.AllowEmpty
 	}
-	return e.Exts.Contains(ext)
+	return e.Exts.MatchString(ext)
 }
 
 // defaultExtensions is the list of default extensions for which to enable gzip.

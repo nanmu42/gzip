@@ -2,7 +2,8 @@ package gzip
 
 import (
 	"net/http"
-	"strings"
+
+	"github.com/signalsciences/ac/acascii"
 )
 
 // ResponseHeaderFilter decide whether or not to compress response
@@ -39,14 +40,14 @@ func (s *SkipCompressedFilter) ShouldCompress(header http.Header) bool {
 //
 // Omit this filter if you want to compress all content type.
 type ContentTypeFilter struct {
-	Types      Set
+	Types      *acascii.Matcher
 	AllowEmpty bool
 }
 
 // NewContentTypeFilter ...
 func NewContentTypeFilter(types []string) *ContentTypeFilter {
 	var (
-		set        = make(Set)
+		nonEmpty   = make([]string, 0, len(types))
 		allowEmpty bool
 	)
 
@@ -55,14 +56,16 @@ func NewContentTypeFilter(types []string) *ContentTypeFilter {
 			allowEmpty = true
 			continue
 		}
-		set.Add(item)
+		nonEmpty = append(nonEmpty, item)
 	}
 
-	return &ContentTypeFilter{Types: set, AllowEmpty: allowEmpty}
+	return &ContentTypeFilter{
+		Types:      acascii.MustCompileString(nonEmpty),
+		AllowEmpty: allowEmpty,
+	}
 }
 
 // ShouldCompress implements RequestFilter interface
-// TODO: optimize with ahocorasick
 func (e *ContentTypeFilter) ShouldCompress(header http.Header) bool {
 	contentType := header.Get("Content-Type")
 
@@ -70,9 +73,7 @@ func (e *ContentTypeFilter) ShouldCompress(header http.Header) bool {
 		return e.AllowEmpty
 	}
 
-	return e.Types.ContainsFunc(func(s string) bool {
-		return strings.Contains(contentType, s)
-	})
+	return e.Types.MatchString(contentType)
 }
 
 // defaultContentType is the list of default content types for which to enable gzip.
