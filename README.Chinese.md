@@ -15,6 +15,8 @@
 ## Gin
 
 ```go
+import github.com/nanmu42/gzip
+
 func main() {
 	g := gin.Default()
 	
@@ -36,6 +38,8 @@ func main() {
 ## net/http
 
 ```go
+import github.com/nanmu42/gzip
+
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
