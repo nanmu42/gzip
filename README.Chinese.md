@@ -1,4 +1,4 @@
-**English** | [中文](https://github.com/nanmu42/gzip/blob/master/README.Chinese.md)
+[English]((https://github.com/nanmu42/gzip/blob/master/README.md)) | **中文**
 
 # gzip
 
@@ -8,17 +8,17 @@
 [![Lint status](https://github.com/nanmu42/gzip/workflows/golangci-lint/badge.svg)](https://github.com/nanmu42/gzip/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nanmu42/gzip)](https://goreportcard.com/report/github.com/nanmu42/gzip)
 
- `Content-Type` and `Content-Length` aware gzip middleware for [Gin](https://github.com/gin-gonic/gin) and [net/http](https://golang.org/pkg/net/http/).
+适用于[Gin](https://github.com/gin-gonic/gin)和[net/http](https://golang.org/pkg/net/http/)的gzip中间件。基于 `Content-Type`、`Content-Length`、扩展名等要素自动判断是否启用压缩。
 
-# Examples
+# 使用示例
 
 ## Gin
 
 ```go
 func main() {
 	g := gin.Default()
-
-    // use default settings
+	
+    // 使用默认设定
 	g.Use(gzip.DefaultHandler().Gin)
 
 	g.GET("/", func(c *gin.Context) {
@@ -42,7 +42,7 @@ func main() {
 		writeString(w, fmt.Sprintf("This content is compressed: l%sng!", strings.Repeat("o", 1000)))
 	})
 
-    // wrap http.Handler using default settings
+    // 使用默认设定
 	log.Println(http.ListenAndServe(fmt.Sprintf(":%d", 3001), gzip.DefaultHandler().WrapHandler(mux)))
 }
 
@@ -52,26 +52,25 @@ func writeString(w http.ResponseWriter, payload string) {
 }
 ```
 
-## Customize Handler
+## 定制`Handler`
 
-Handler can be customized during initialization:
+在创建`Handler`时，可以定制参数以满足你的需要：
 
 ```go
 import github.com/nanmu42/gzip
 
 handler := gzip.NewHandler(gzip.Config{
-    // gzip compression level to use
+    // gzip压缩等级
 	CompressionLevel: 6,
-    // minimum content length to trigger gzip, the unit is in byte.
+    // 使用gzip的最小body体积，单位：byte
 	MinContentLength: 256,
-    // RequestFilter decide whether or not to compress response judging by request.
-    // Filters are applied in the sequence here.
+    // 请求过滤器基于请求来判断是否对这条请求的返回启用gzip，
+    // 过滤器按其定义顺序执行，下同。
 	RequestFilter: []RequestFilter{
 	    NewCommonRequestFilter(),
 	    DefaultExtensionFilter(),
 	},
-    // ResponseHeaderFilter decide whether or not to compress response
-    // judging by request
+    // 返回header过滤器基于返回的header判断是否对这条请求的返回启用gzip
 	ResponseHeaderFilter: []ResponseHeaderFilter{
 		NewSkipCompressedFilter(),
 		DefaultContentTypeFilter(),
@@ -79,29 +78,29 @@ handler := gzip.NewHandler(gzip.Config{
 })
 ```
 
-`RequestFilter` and `ResponseHeaderFilter` are interfaces.
-You may define one that specially suits your need.
+`RequestFilter` 和 `ResponseHeaderFilter` 是 interface.
+你可以实现你自己的过滤器。
 
-# Limitation
+# Handler的局限性
 
-* You should always provide a `Content-Type` in http response's header, as handler does not guess;
-* handler looks up `Content-Length` in http response's header firstly, falls back to `len(data)` of the first `http.ResponseWriter.Write(data []byte)` calling. It may not use gzip if `Content-Length` is absent and `len(data)` is low.
+* 总是在返回中提供`Content-Type`，Handler不会对未知`Content-Type`的返回进行类型猜测；
+* Handler会先在返回的 `Content-Length` 中查询body体积，如果没有就再查看`http.ResponseWriter.Write(data []byte)`在首次调用时的 `len(data)`作为参考。倘若返回的 `Content-Length`不存在，且`http.ResponseWriter.Write(data []byte)`首次调用时的`len(data)`较小，这条返回会被错误认为无需压缩。
 
-If you are using Gin's `c.JSON()` or `c.PureJSON()`, you are safe from above limitation, as Gin sets proper `Content-Type` and write response in full length.
+如果你使用的是Gin的`c.JSON()`或`c.PureJSON()`，无需担心上述问题。
 
-If you are using `net/http`, make sure above cases are considered.
+如果你直接使用`net/http`，请妥善处理上述问题。
 
-# Status: v0
+# 项目状态：v0
 
-API not stabilized, things may breaks.
+API可能会在未来变更。代码也许会爆炸。
 
-You are welcome to try gzip on your test/unimportant environments.
+欢迎在测试环境或不重要的环境使用本项目。
 
-Pull requests and issues are welcome.
+欢迎提PR和Issue.
 
-# Acknowledgement
+# 致谢
 
-During the development of this work, the author took following works/materials as reference:
+在本项目的开发中，作者参考了下列项目和资料：
 
 * https://github.com/caddyserver/caddy/tree/master/caddyhttp/gzip (Apache License 2.0)
 * https://github.com/gin-contrib/gzip (MIT License)
