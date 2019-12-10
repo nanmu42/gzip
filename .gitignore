@@ -14,5 +14,6 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Test coverage
+# Test coverage and profile
 coverage.txt
+*.prof
