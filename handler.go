@@ -46,6 +46,7 @@ type Handler struct {
 	requestFilter        []RequestFilter
 	responseHeaderFilter []ResponseHeaderFilter
 	gzipWriterPool       sync.Pool
+	wrapperPool          sync.Pool
 }
 
 // NewHandler initialized a costumed gzip handler to take care of response compression.
@@ -64,11 +65,14 @@ func NewHandler(config Config) *Handler {
 		minContentLength:     config.MinContentLength,
 		requestFilter:        config.RequestFilter,
 		responseHeaderFilter: config.ResponseHeaderFilter,
-		gzipWriterPool: sync.Pool{
-			New: func() interface{} {
-				writer, _ := gzip.NewWriterLevel(ioutil.Discard, config.CompressionLevel)
-				return writer
-			}},
+	}
+
+	handler.gzipWriterPool.New = func() interface{} {
+		writer, _ := gzip.NewWriterLevel(ioutil.Discard, handler.compressionLevel)
+		return writer
+	}
+	handler.wrapperPool.New = func() interface{} {
+		return newWriterWrapper(handler.responseHeaderFilter, handler.minContentLength, nil, handler.getGzipWriter, handler.putGzipWriter)
 	}
 
 	return &handler
@@ -105,6 +109,20 @@ func (h *Handler) putGzipWriter(w *gzip.Writer) {
 	_ = w.Close()
 	w.Reset(ioutil.Discard)
 	h.gzipWriterPool.Put(w)
+}
+
+func (h *Handler) getWriteWrapper() *writerWrapper {
+	return h.wrapperPool.Get().(*writerWrapper)
+}
+
+func (h *Handler) putWriteWrapper(w *writerWrapper) {
+	if w == nil {
+		return
+	}
+
+	w.CleanUp()
+	w.OriginWriter = nil
+	h.wrapperPool.Put(w)
 }
 
 type ginGzipWriter struct {
@@ -151,12 +169,13 @@ func (h *Handler) Gin(c *gin.Context) {
 	}
 
 	if shouldCompress {
-		wrapper := newWriterWrapper(h.responseHeaderFilter, h.minContentLength, c.Writer, h.getGzipWriter, h.putGzipWriter)
+		wrapper := h.getWriteWrapper()
+		wrapper.Reset(c.Writer)
 		c.Writer = &ginGzipWriter{
 			ResponseWriter: c.Writer,
 			writerWrapper:  wrapper,
 		}
-		defer wrapper.CleanUp()
+		defer h.putWriteWrapper(wrapper)
 	}
 
 	c.Next()
@@ -175,9 +194,10 @@ func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 		}
 
 		if shouldCompress {
-			wrapper := newWriterWrapper(h.responseHeaderFilter, h.minContentLength, w, h.getGzipWriter, h.putGzipWriter)
+			wrapper := h.getWriteWrapper()
+			wrapper.Reset(w)
 			w = wrapper
-			defer wrapper.CleanUp()
+			defer h.putWriteWrapper(wrapper)
 		}
 
 		next.ServeHTTP(w, r)

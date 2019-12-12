@@ -43,6 +43,18 @@ func newWriterWrapper(filters []ResponseHeaderFilter, minContentLength int64, or
 	}
 }
 
+// Reset the wrapper into a fresh one,
+// writing to originWriter
+func (w *writerWrapper) Reset(originWriter http.ResponseWriter) {
+	w.OriginWriter = originWriter
+	w.shouldCompress = true
+
+	if w.gzipWriter != nil {
+		w.PutGzipWriter(w.gzipWriter)
+		w.gzipWriter = nil
+	}
+}
+
 // interface guard
 var _ http.ResponseWriter = (*writerWrapper)(nil)
 var _ http.Flusher = (*writerWrapper)(nil)
