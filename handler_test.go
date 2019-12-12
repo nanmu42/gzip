@@ -1,13 +1,22 @@
 package gzip
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+const handlerTestSize = 256
 
 func newGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -15,8 +24,26 @@ func newGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
 	g := gin.New()
 	g.Use(middleware...)
 
-	g.GET("/", func(c *gin.Context) {
+	g.POST("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/plain; charset=utf8", payload)
+	})
+
+	return g
+}
+
+func newEchoGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
+
+	g := gin.New()
+	g.Use(middleware...)
+
+	g.POST("/", func(c *gin.Context) {
+		var buf bytes.Buffer
+
+		_, _ = io.Copy(&buf, c.Request.Body)
+		_, _ = buf.Write(payload)
+
+		c.Data(http.StatusOK, "text/plain; charset=utf8", buf.Bytes())
 	})
 
 	return g
@@ -26,6 +53,24 @@ func newHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Han
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 		_, _ = w.Write(payload)
+	})
+
+	for _, wrap := range wrapper {
+		handler = wrap(handler)
+	}
+
+	return handler
+}
+
+func newEchoHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Handler) http.Handler {
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf8")
+
+		var buf bytes.Buffer
+
+		_, _ = io.Copy(&buf, r.Body)
+		_, _ = buf.Write(payload)
+		_, _ = w.Write(buf.Bytes())
 	})
 
 	for _, wrap := range wrapper {
@@ -190,16 +235,33 @@ func TestSoloGinHandler(t *testing.T) {
 
 func TestGinWithDefaultHandler(t *testing.T) {
 	var (
-		g = newGinInstance(bigPayload, DefaultHandler().Gin)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
-		w = NewNopWriter()
+		g = newEchoGinInstance(bigPayload, DefaultHandler().Gin)
 	)
 
-	r.Header.Set("Accept-Encoding", "gzip")
+	for i := 0; i < handlerTestSize; i++ {
+		var seq = strconv.Itoa(i)
+		t.Run(seq, func(t *testing.T) {
+			t.Parallel()
 
-	g.ServeHTTP(w, r)
+			var (
+				w = httptest.NewRecorder()
+				r = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(seq))
+			)
 
-	assert.Equal(t, "gzip", w.Header().Get("Content-Encoding"))
+			r.Header.Set("Accept-Encoding", "gzip")
+			g.ServeHTTP(w, r)
+
+			result := w.Result()
+			require.EqualValues(t, http.StatusOK, result.StatusCode)
+			require.Equal(t, "gzip", result.Header.Get("Content-Encoding"))
+
+			reader, err := gzip.NewReader(result.Body)
+			require.NoError(t, err)
+			body, err := ioutil.ReadAll(reader)
+			require.NoError(t, err)
+			require.True(t, bytes.HasPrefix(body, []byte(seq)))
+		})
+	}
 }
 
 func TestSoloHTTP(t *testing.T) {
@@ -218,14 +280,31 @@ func TestSoloHTTP(t *testing.T) {
 
 func TestHTTPWithDefaultHandler(t *testing.T) {
 	var (
-		g = newHTTPInstance(bigPayload, DefaultHandler().WrapHandler)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
-		w = NewNopWriter()
+		g = newEchoHTTPInstance(bigPayload, DefaultHandler().WrapHandler)
 	)
 
-	r.Header.Set("Accept-Encoding", "gzip")
+	for i := 0; i < handlerTestSize; i++ {
+		var seq = strconv.Itoa(i)
+		t.Run(seq, func(t *testing.T) {
+			t.Parallel()
 
-	g.ServeHTTP(w, r)
+			var (
+				w = httptest.NewRecorder()
+				r = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(seq))
+			)
 
-	assert.Equal(t, "gzip", w.Header().Get("Content-Encoding"))
+			r.Header.Set("Accept-Encoding", "gzip")
+			g.ServeHTTP(w, r)
+
+			result := w.Result()
+			require.EqualValues(t, http.StatusOK, result.StatusCode)
+			require.Equal(t, "gzip", result.Header.Get("Content-Encoding"))
+
+			reader, err := gzip.NewReader(result.Body)
+			require.NoError(t, err)
+			body, err := ioutil.ReadAll(reader)
+			require.NoError(t, err)
+			require.True(t, bytes.HasPrefix(body, []byte(seq)))
+		})
+	}
 }
