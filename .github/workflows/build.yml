@@ -25,7 +25,10 @@ jobs:
       - name: Benchmark
         run: go test -benchmem -bench .
 
+      - name: Benchmark with race detector
+        run: go test -race -benchmem -bench .
+
       - name: Codecov
         uses: codecov/codecov-action@v1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }} #required
+          token: ${{ secrets.CODECOV_TOKEN }}
