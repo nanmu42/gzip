@@ -171,11 +171,15 @@ func (h *Handler) Gin(c *gin.Context) {
 	if shouldCompress {
 		wrapper := h.getWriteWrapper()
 		wrapper.Reset(c.Writer)
+		originWriter := c.Writer
 		c.Writer = &ginGzipWriter{
 			ResponseWriter: c.Writer,
 			writerWrapper:  wrapper,
 		}
-		defer h.putWriteWrapper(wrapper)
+		defer func() {
+			h.putWriteWrapper(wrapper)
+			c.Writer = originWriter
+		}()
 	}
 
 	c.Next()
@@ -196,8 +200,12 @@ func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 		if shouldCompress {
 			wrapper := h.getWriteWrapper()
 			wrapper.Reset(w)
+			originWriter := w
 			w = wrapper
-			defer h.putWriteWrapper(wrapper)
+			defer func() {
+				h.putWriteWrapper(wrapper)
+				w = originWriter
+			}()
 		}
 
 		next.ServeHTTP(w, r)

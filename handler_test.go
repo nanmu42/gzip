@@ -22,6 +22,7 @@ func newGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	g := gin.New()
+	g.HandleMethodNotAllowed = true
 	g.Use(middleware...)
 
 	g.POST("/", func(c *gin.Context) {
@@ -142,7 +143,7 @@ func TestNewHandler_Checks(t *testing.T) {
 func BenchmarkSoleGin_SmallPayload(b *testing.B) {
 	var (
 		g = newGinInstance(smallPayload)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
 
@@ -162,7 +163,7 @@ func BenchmarkSoleGin_SmallPayload(b *testing.B) {
 func BenchmarkGinWithDefaultHandler_SmallPayload(b *testing.B) {
 	var (
 		g = newGinInstance(smallPayload, DefaultHandler().Gin)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
 
@@ -182,7 +183,7 @@ func BenchmarkGinWithDefaultHandler_SmallPayload(b *testing.B) {
 func BenchmarkSoleGin_BigPayload(b *testing.B) {
 	var (
 		g = newGinInstance(bigPayload)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
 
@@ -202,7 +203,7 @@ func BenchmarkSoleGin_BigPayload(b *testing.B) {
 func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 	var (
 		g = newGinInstance(bigPayload, DefaultHandler().Gin)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
 
@@ -222,7 +223,7 @@ func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 func TestSoloGinHandler(t *testing.T) {
 	var (
 		g = newGinInstance(bigPayload)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
 
@@ -264,10 +265,64 @@ func TestGinWithDefaultHandler(t *testing.T) {
 	}
 }
 
+func TestGinWithDefaultHandler_404(t *testing.T) {
+	var (
+		g = newGinInstance(bigPayload, DefaultHandler().Gin)
+		r = httptest.NewRequest(http.MethodPost, "/404", nil)
+		w = httptest.NewRecorder()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+
+	g.ServeHTTP(w, r)
+
+	result := w.Result()
+
+	assert.EqualValues(t, http.StatusNotFound, result.StatusCode)
+	assert.Equal(t, "404 page not found", w.Body.String())
+}
+
+func TestGinWithDefaultHandler_405(t *testing.T) {
+	var (
+		g = newGinInstance(bigPayload, DefaultHandler().Gin)
+		r = httptest.NewRequest(http.MethodPatch, "/", nil)
+		w = httptest.NewRecorder()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+
+	g.ServeHTTP(w, r)
+
+	result := w.Result()
+
+	assert.EqualValues(t, http.StatusMethodNotAllowed, result.StatusCode)
+	assert.Equal(t, "405 method not allowed", w.Body.String())
+}
+
+func TestHTTPWithDefaultHandler_404(t *testing.T) {
+	var (
+		g = newHTTPInstance(bigPayload, DefaultHandler().WrapHandler)
+		r = httptest.NewRequest(http.MethodPost, "/404", nil)
+		w = httptest.NewRecorder()
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle("/somewhere", g)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+
+	mux.ServeHTTP(w, r)
+
+	result := w.Result()
+
+	assert.EqualValues(t, http.StatusNotFound, result.StatusCode)
+	assert.Equal(t, "404 page not found\n", w.Body.String())
+}
+
 func TestSoloHTTP(t *testing.T) {
 	var (
 		g = newHTTPInstance(bigPayload)
-		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
 
