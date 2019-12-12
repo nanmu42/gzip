@@ -21,15 +21,18 @@ type writerWrapper struct {
 	PutGzipWriter func(*gzip.Writer)
 
 	// internal below
+	// *** WARNING ***
+	// *writerWrapper.Reset() method must be updated
+	// upon following field changing
 
 	// compress or not
 	// default to true
 	shouldCompress bool
-	gzipWriter     *gzip.Writer
 	// is header already flushed?
 	headerFlushed bool
 	didFirstWrite bool
 	statusCode    int
+	gzipWriter    *gzip.Writer
 }
 
 func newWriterWrapper(filters []ResponseHeaderFilter, minContentLength int64, originWriter http.ResponseWriter, getGzipWriter func() *gzip.Writer, putGzipWriter func(*gzip.Writer)) *writerWrapper {
@@ -47,7 +50,15 @@ func newWriterWrapper(filters []ResponseHeaderFilter, minContentLength int64, or
 // writing to originWriter
 func (w *writerWrapper) Reset(originWriter http.ResponseWriter) {
 	w.OriginWriter = originWriter
+
+	// internal below
+
+	// reset status with caution
+	// all internal fields should be taken good care
 	w.shouldCompress = true
+	w.headerFlushed = false
+	w.didFirstWrite = false
+	w.statusCode = 0
 
 	if w.gzipWriter != nil {
 		w.PutGzipWriter(w.gzipWriter)
