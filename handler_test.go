@@ -22,6 +22,19 @@ func newGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
 	return g
 }
 
+func newHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Handler) http.Handler {
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf8")
+		_, _ = w.Write(payload)
+	})
+
+	for _, wrap := range wrapper {
+		handler = wrap(handler)
+	}
+
+	return handler
+}
+
 type NopWriter struct {
 	header http.Header
 }
@@ -89,7 +102,7 @@ func BenchmarkSoleGin_SmallPayload(b *testing.B) {
 	)
 
 	r.Header.Set("Accept-Encoding", "gzip")
-	b.ReportAllocs()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		g.ServeHTTP(w, r)
@@ -110,7 +123,6 @@ func BenchmarkGinWithDefaultHandler_SmallPayload(b *testing.B) {
 
 	r.Header.Set("Accept-Encoding", "gzip")
 
-	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		g.ServeHTTP(w, r)
@@ -130,7 +142,7 @@ func BenchmarkSoleGin_BigPayload(b *testing.B) {
 	)
 
 	r.Header.Set("Accept-Encoding", "gzip")
-	b.ReportAllocs()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		g.ServeHTTP(w, r)
@@ -151,7 +163,6 @@ func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 
 	r.Header.Set("Accept-Encoding", "gzip")
 
-	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		g.ServeHTTP(w, r)
@@ -161,4 +172,60 @@ func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 	if encoding := w.Header().Get("Content-Encoding"); encoding != "gzip" {
 		b.Fatalf("Content-Encoding is not gzip, but %q", encoding)
 	}
+}
+
+func TestSoloGinHandler(t *testing.T) {
+	var (
+		g = newGinInstance(bigPayload)
+		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		w = NewNopWriter()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+
+	g.ServeHTTP(w, r)
+
+	assert.Empty(t, w.Header().Get("Content-Encoding"))
+}
+
+func TestGinWithDefaultHandler(t *testing.T) {
+	var (
+		g = newGinInstance(bigPayload, DefaultHandler().Gin)
+		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		w = NewNopWriter()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+
+	g.ServeHTTP(w, r)
+
+	assert.Equal(t, "gzip", w.Header().Get("Content-Encoding"))
+}
+
+func TestSoloHTTP(t *testing.T) {
+	var (
+		g = newHTTPInstance(bigPayload)
+		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		w = NewNopWriter()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+
+	g.ServeHTTP(w, r)
+
+	assert.Empty(t, w.Header().Get("Content-Encoding"))
+}
+
+func TestHTTPWithDefaultHandler(t *testing.T) {
+	var (
+		g = newHTTPInstance(bigPayload, DefaultHandler().WrapHandler)
+		r = httptest.NewRequest(http.MethodGet, "/", nil)
+		w = NewNopWriter()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+
+	g.ServeHTTP(w, r)
+
+	assert.Equal(t, "gzip", w.Header().Get("Content-Encoding"))
 }
