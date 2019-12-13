@@ -59,3 +59,23 @@ BenchmarkGinWithDefaultHandler_BigPayload-12             2991879               3
 PASS
 ok      github.com/nanmu42/gzip 6.425s
 ```
+
+# v0.4.0
+
+v0.4.0 fixes panic on Gin's no route error.
+
+# v0.5.0
+
+v0.5.0 fixes panic on second calling to Write().
+
+```
+goos: linux
+goarch: amd64
+pkg: github.com/nanmu42/gzip
+BenchmarkSoleGin_SmallPayload-12                         7490284               201 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_SmallPayload-12           2292319               501 ns/op              96 B/op          3 allocs/op
+BenchmarkSoleGin_BigPayload-12                           6403441               190 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_BigPayload-12             2951451               410 ns/op              96 B/op          3 allocs/op
+PASS
+ok      github.com/nanmu42/gzip 6.620s
+```
