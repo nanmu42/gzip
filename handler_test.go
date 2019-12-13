@@ -363,3 +363,52 @@ func TestHTTPWithDefaultHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPWithDefaultHandler_TinyPayload_WriteTwice(t *testing.T) {
+	var (
+		handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf8")
+			_, _ = io.WriteString(w, "part 1\n")
+			_, _ = io.WriteString(w, "part 2\n")
+		})
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
+		w = httptest.NewRecorder()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+	handler = DefaultHandler().WrapHandler(handler)
+
+	handler.ServeHTTP(w, r)
+
+	result := w.Result()
+
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.Empty(t, result.Header.Get("Vary"))
+	assert.Empty(t, result.Header.Get("Content-Encoding"))
+	assert.Equal(t, "part 1\npart 2\n", w.Body.String())
+}
+
+func TestHTTPWithDefaultHandler_TinyPayload_WriteThreeTimes(t *testing.T) {
+	var (
+		handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf8")
+			_, _ = io.WriteString(w, "part 1\n")
+			_, _ = io.WriteString(w, "part 2\n")
+			_, _ = io.WriteString(w, "part 3\n")
+		})
+		r = httptest.NewRequest(http.MethodPost, "/", nil)
+		w = httptest.NewRecorder()
+	)
+
+	r.Header.Set("Accept-Encoding", "gzip")
+	handler = DefaultHandler().WrapHandler(handler)
+
+	handler.ServeHTTP(w, r)
+
+	result := w.Result()
+
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.Empty(t, result.Header.Get("Vary"))
+	assert.Empty(t, result.Header.Get("Content-Encoding"))
+	assert.Equal(t, "part 1\npart 2\npart 3\n", w.Body.String())
+}

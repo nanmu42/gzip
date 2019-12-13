@@ -90,6 +90,16 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 
+	if w.didFirstWrite {
+		if w.shouldCompress {
+			return w.gzipWriter.Write(data)
+		}
+		return w.OriginWriter.Write(data)
+	}
+
+	// first time to write
+
+	w.didFirstWrite = true
 	header := w.Header()
 	for _, filter := range w.Filters {
 		w.shouldCompress = filter.ShouldCompress(header)
@@ -97,25 +107,14 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 			break
 		}
 	}
-
-	// use origin handler directly
-	if !w.shouldCompress {
-		w.flushHeader()
-		w.didFirstWrite = true
-		return w.OriginWriter.Write(data)
-	}
-
-	if !w.didFirstWrite {
-		w.didFirstWrite = true
-		w.shouldCompress = w.enoughContentLength(data)
-		w.flushHeader()
-
-		if w.shouldCompress {
-			w.initGzipWriter()
-		}
-	}
-
+	// pass header check, inspect more
 	if w.shouldCompress {
+		w.shouldCompress = w.enoughContentLength(data)
+	}
+
+	w.flushHeader()
+	if w.shouldCompress {
+		w.initGzipWriter()
 		return w.gzipWriter.Write(data)
 	}
 
