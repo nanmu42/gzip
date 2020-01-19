@@ -33,6 +33,7 @@ func NewCommonRequestFilter() *CommonRequestFilter {
 // ShouldCompress implements RequestFilter interface
 func (c *CommonRequestFilter) ShouldCompress(req *http.Request) bool {
 	return req.Method != http.MethodHead &&
+		req.Method != http.MethodOptions &&
 		req.Header.Get("Upgrade") == "" &&
 		strings.Contains(req.Header.Get("Accept-Encoding"), "gzip")
 }

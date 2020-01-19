@@ -412,3 +412,32 @@ func TestHTTPWithDefaultHandler_TinyPayload_WriteThreeTimes(t *testing.T) {
 	assert.Empty(t, result.Header.Get("Content-Encoding"))
 	assert.Equal(t, "part 1\npart 2\npart 3\n", w.Body.String())
 }
+
+func TestGinCORSMiddleware(t *testing.T) {
+	var (
+		g = newGinInstance(bigPayload, DefaultHandler().Gin, corsMiddleware)
+		r = httptest.NewRequest(http.MethodOptions, "/", nil)
+		w = httptest.NewRecorder()
+	)
+
+	g.ServeHTTP(w, r)
+	result := w.Result()
+
+	assert.EqualValues(t, http.StatusNoContent, result.StatusCode)
+	assert.Equal(t, "*", result.Header.Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "POST", result.Header.Get("Access-Control-Allow-Methods"))
+	assert.EqualValues(t, 0, w.Body.Len())
+}
+
+// corsMiddleware allows CORS request
+func corsMiddleware(c *gin.Context) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "POST")
+
+	if c.Request.Method == http.MethodOptions {
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	}
+
+	c.Next()
+}
