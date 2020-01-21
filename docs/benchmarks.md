@@ -79,3 +79,26 @@ BenchmarkGinWithDefaultHandler_BigPayload-12             2951451               4
 PASS
 ok      github.com/nanmu42/gzip 6.620s
 ```
+
+# v0.6.0
+
+v0.6.0 fixes wrong status code handling CORS OPTIONS request by gin's other middleware.
+
+# v0.7.0
+
+* writerWrapper: buffer writes to decide whether use gzip or not
+* writerWrapper: detect Content-Type if there's none
+* ginGzipWriter: full implementation for gin.ResponseWriter excluding Pusher()
+
+
+```
+goos: linux
+goarch: amd64
+pkg: github.com/nanmu42/gzip
+BenchmarkSoleGin_SmallPayload-12                         7900057               184 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_SmallPayload-12           2171088               510 ns/op              96 B/op          3 allocs/op
+BenchmarkSoleGin_BigPayload-12                           7402651               184 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_BigPayload-12             2911062               404 ns/op              96 B/op          3 allocs/op
+PASS
+ok      github.com/nanmu42/gzip 6.634s
+```

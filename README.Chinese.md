@@ -8,9 +8,11 @@
 [![Lint status](https://github.com/nanmu42/gzip/workflows/golangci-lint/badge.svg)](https://github.com/nanmu42/gzip/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nanmu42/gzip)](https://goreportcard.com/report/github.com/nanmu42/gzip)
 
-适用于[Gin](https://github.com/gin-gonic/gin)和[net/http](https://golang.org/pkg/net/http/)的gzip中间件。基于 `Content-Type`、`Content-Length`、扩展名等要素自动判断是否启用压缩。
+一个智能、高效、开箱即用、可定制的，适用于[Gin](https://github.com/gin-gonic/gin)和[net/http](https://golang.org/pkg/net/http/)的gzip中间件。
 
 # 使用示例
+
+默认设置开箱即用，可以满足大部分场景。
 
 ## Gin
 
@@ -85,14 +87,14 @@ handler := gzip.NewHandler(gzip.Config{
 `RequestFilter` 和 `ResponseHeaderFilter` 是 interface.
 你可以实现你自己的过滤器。
 
-# Handler的局限性
+# 效率
 
-* 总是在返回中提供`Content-Type`，Handler不会对未知`Content-Type`的返回进行类型猜测；
-* Handler会先在返回的 `Content-Length` 中查询body体积，如果没有就再查看`http.ResponseWriter.Write(data []byte)`在首次调用时的 `len(data)`作为参考。倘若返回的 `Content-Length`不存在，且`http.ResponseWriter.Write(data []byte)`首次调用时的`len(data)`较小，这条返回会被错误认为无需压缩。
+本中间件经过了性能调优，以保证高效运行，[查看benchmark](https://github.com/nanmu42/gzip/blob/master/docs/benchmarks.md)。
 
-如果你使用的是Gin的`c.JSON()`或`c.PureJSON()`，无需担心上述问题。
+# 局限性
 
-如果你直接使用`net/http`，请妥善处理上述问题。
+* 你应该总是在返回中提供`Content-Type`。虽然Handler会在`Content-Type`缺失时使用`http.DetectContentType()`进行猜测，但是效果并没有那么好；
+* 返回的`Content-Length` 缺失时，Handler可能会缓冲返回的报文数据以决定报文是否大到值得进行压缩，如果`MinContentLength`设置得太大，这个过程可能会带来内存压力。Handler针对这个情况做了一些优化，例如查看`http.ResponseWriter.Write(data []byte)`在首次调用时的 `len(data)`，以及资源复用。
 
 # 项目状态：v0
 

@@ -8,7 +8,7 @@
 [![Lint status](https://github.com/nanmu42/gzip/workflows/golangci-lint/badge.svg)](https://github.com/nanmu42/gzip/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nanmu42/gzip)](https://goreportcard.com/report/github.com/nanmu42/gzip)
 
- `Content-Type` and `Content-Length` aware gzip middleware for [Gin](https://github.com/gin-gonic/gin) and [net/http](https://golang.org/pkg/net/http/).
+Finally, a smart, efficient, out-of-the-box yet customizable gzip middleware for [Gin](https://github.com/gin-gonic/gin) and [net/http](https://golang.org/pkg/net/http/).
 
 # Examples
 
@@ -86,14 +86,14 @@ handler := gzip.NewHandler(gzip.Config{
 `RequestFilter` and `ResponseHeaderFilter` are interfaces.
 You may define one that specially suits your need.
 
+# Performance
+
+This middleware is fine-tuned so that little overhead is added to your program. See [benchmarks](https://github.com/nanmu42/gzip/blob/master/docs/benchmarks.md).
+
 # Limitation
 
-* You should always provide a `Content-Type` in http response's header, as handler does not guess;
-* handler looks up `Content-Length` in http response's header firstly, falls back to `len(data)` of the first `http.ResponseWriter.Write(data []byte)` calling. It may not use gzip if `Content-Length` is absent and `len(data)` is low.
-
-If you are using Gin's `c.JSON()` or `c.PureJSON()`, you are safe from above limitation, as Gin sets proper `Content-Type` and write response in full length.
-
-If you are using `net/http`, make sure above cases are considered.
+* You should always provide a `Content-Type` in http response's header, though handler guesses by `http.DetectContentType()`as makeshift;
+* When `Content-Length` is not available, handler may buffer your writes to decide if its big enough to do a meaningful compression. A high `MinContentLength` may bring memory overhead, although the handler tries to be smart by reuse buffers and tests if `len(data)` of the first `http.ResponseWriter.Write(data []byte)` calling suffices or not.
 
 # Status: v0
 
