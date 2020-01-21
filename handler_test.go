@@ -429,6 +429,27 @@ func TestGinCORSMiddleware(t *testing.T) {
 	assert.EqualValues(t, 0, w.Body.Len())
 }
 
+func TestGinCORSMiddlewareWithDummyConfig(t *testing.T) {
+	var (
+		g = newGinInstance(bigPayload, NewHandler(Config{
+			CompressionLevel:     DefaultCompression,
+			MinContentLength:     100,
+			RequestFilter:        nil,
+			ResponseHeaderFilter: nil,
+		}).Gin, corsMiddleware)
+		r = httptest.NewRequest(http.MethodOptions, "/", nil)
+		w = httptest.NewRecorder()
+	)
+
+	g.ServeHTTP(w, r)
+	result := w.Result()
+
+	assert.EqualValues(t, http.StatusNoContent, result.StatusCode)
+	assert.Equal(t, "*", result.Header.Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "POST", result.Header.Get("Access-Control-Allow-Methods"))
+	assert.EqualValues(t, 0, w.Body.Len())
+}
+
 // corsMiddleware allows CORS request
 func corsMiddleware(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")

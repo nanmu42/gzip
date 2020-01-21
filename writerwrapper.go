@@ -35,9 +35,15 @@ type writerWrapper struct {
 	headerFlushed         bool
 	responseHeaderChecked bool
 	statusCode            int
-	gzipWriter            *gzip.Writer
-	bodyBuffer            []byte
+	// how many raw bytes has been written
+	size       int
+	gzipWriter *gzip.Writer
+	bodyBuffer []byte
 }
+
+// interface guard
+var _ http.ResponseWriter = (*writerWrapper)(nil)
+var _ http.Flusher = (*writerWrapper)(nil)
 
 func newWriterWrapper(filters []ResponseHeaderFilter, minContentLength int64, originWriter http.ResponseWriter, getGzipWriter func() *gzip.Writer, putGzipWriter func(*gzip.Writer)) *writerWrapper {
 	return &writerWrapper{
@@ -65,6 +71,7 @@ func (w *writerWrapper) Reset(originWriter http.ResponseWriter) {
 	w.responseHeaderChecked = false
 	w.bodyBigEnough = false
 	w.statusCode = 0
+	w.size = 0
 
 	if w.gzipWriter != nil {
 		w.PutGzipWriter(w.gzipWriter)
@@ -75,11 +82,19 @@ func (w *writerWrapper) Reset(originWriter http.ResponseWriter) {
 	}
 }
 
-// interface guard
-var _ http.ResponseWriter = (*writerWrapper)(nil)
-var _ http.Flusher = (*writerWrapper)(nil)
+func (w *writerWrapper) Status() int {
+	return w.statusCode
+}
 
-func (w *writerWrapper) headerWritten() bool {
+func (w *writerWrapper) Size() int {
+	return w.size
+}
+
+func (w *writerWrapper) Written() bool {
+	return w.headerFlushed || len(w.bodyBuffer) > 0
+}
+
+func (w *writerWrapper) WriteHeaderCalled() bool {
 	return w.statusCode != 0
 }
 
@@ -95,7 +110,9 @@ func (w *writerWrapper) Header() http.Header {
 
 // Write implements http.ResponseWriter
 func (w *writerWrapper) Write(data []byte) (int, error) {
-	if !w.headerWritten() {
+	w.size += len(data)
+
+	if !w.WriteHeaderCalled() {
 		w.WriteHeader(http.StatusOK)
 	}
 
@@ -114,14 +131,14 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 		for _, filter := range w.Filters {
 			w.shouldCompress = filter.ShouldCompress(header)
 			if !w.shouldCompress {
-				w.flushHeader()
+				w.WriteHeaderNow()
 				return w.OriginWriter.Write(data)
 			}
 		}
 
 		if w.enoughContentLength(data) {
 			w.bodyBigEnough = true
-			w.flushHeader()
+			w.WriteHeaderNow()
 			w.initGzipWriter()
 			return w.gzipWriter.Write(data)
 		}
@@ -129,7 +146,8 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 
 	if !w.writeBuffer(data) {
 		w.bodyBigEnough = true
-		w.flushHeader()
+		// TODO: detect Content-Type if there's none
+		w.WriteHeaderNow()
 		w.initGzipWriter()
 		written, err := w.gzipWriter.Write(w.bodyBuffer)
 		if err != nil {
@@ -173,9 +191,9 @@ func (w *writerWrapper) enoughContentLength(data []byte) bool {
 // WriteHeader implements http.ResponseWriter
 //
 // WriteHeader does not really calls originalHandler's WriteHeader,
-// and the calling will actually be handler by flushHeader().
+// and the calling will actually be handler by WriteHeaderNow().
 func (w *writerWrapper) WriteHeader(statusCode int) {
-	if w.headerWritten() {
+	if w.WriteHeaderCalled() {
 		return
 	}
 
@@ -192,17 +210,21 @@ func (w *writerWrapper) WriteHeader(statusCode int) {
 	}
 }
 
-// flushHeader must always be called and called after
+// WriteHeaderNow Forces to write the http header (status code + headers).
+//
+// WriteHeaderNow must always be called and called after
 // WriteHeader() is called and
 // w.shouldCompress is decided.
-func (w *writerWrapper) flushHeader() {
+//
+// This method is usually called by gin's AbortWithStatus()
+func (w *writerWrapper) WriteHeaderNow() {
 	if w.headerFlushed {
 		return
 	}
 
 	// if neither WriteHeader() or Write() are called,
 	// do nothing
-	if !w.headerWritten() {
+	if !w.WriteHeaderCalled() {
 		return
 	}
 
@@ -230,13 +252,13 @@ func (w *writerWrapper) FinishWriting() {
 	// still buffering
 	if w.shouldCompress && !w.bodyBigEnough {
 		w.shouldCompress = false
-		w.flushHeader()
+		w.WriteHeaderNow()
 		if len(w.bodyBuffer) > 0 {
 			_, _ = w.OriginWriter.Write(w.bodyBuffer)
 		}
 	}
 
-	w.flushHeader()
+	w.WriteHeaderNow()
 	if w.gzipWriter != nil {
 		w.PutGzipWriter(w.gzipWriter)
 		w.gzipWriter = nil

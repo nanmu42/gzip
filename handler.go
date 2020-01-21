@@ -1,9 +1,11 @@
 package gzip
 
 import (
+	"bufio"
 	"compress/gzip"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"sync"
 
@@ -126,35 +128,65 @@ func (h *Handler) putWriteWrapper(w *writerWrapper) {
 }
 
 type ginGzipWriter struct {
-	*writerWrapper
-	gin.ResponseWriter
+	wrapper      *writerWrapper
+	originWriter gin.ResponseWriter
 }
 
+// interface guard
 var _ gin.ResponseWriter = (*ginGzipWriter)(nil)
+
+func (g *ginGzipWriter) WriteHeaderNow() {
+	g.wrapper.WriteHeaderNow()
+}
+
+func (g *ginGzipWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return g.originWriter.Hijack()
+}
+
+func (g *ginGzipWriter) CloseNotify() <-chan bool {
+	return g.originWriter.CloseNotify()
+}
+
+func (g *ginGzipWriter) Status() int {
+	return g.wrapper.Status()
+}
+
+func (g *ginGzipWriter) Size() int {
+	return g.wrapper.Size()
+}
+
+func (g *ginGzipWriter) Written() bool {
+	return g.wrapper.Written()
+}
+
+func (g *ginGzipWriter) Pusher() http.Pusher {
+	// TODO: not sure how to implement gzip for HTTP2
+	return nil
+}
 
 // WriteString implements interface gin.ResponseWriter
 func (g *ginGzipWriter) WriteString(s string) (int, error) {
-	return g.writerWrapper.Write([]byte(s))
+	return g.wrapper.Write([]byte(s))
 }
 
 // Write implements interface gin.ResponseWriter
 func (g *ginGzipWriter) Write(data []byte) (int, error) {
-	return g.writerWrapper.Write(data)
+	return g.wrapper.Write(data)
 }
 
 // WriteHeader implements interface gin.ResponseWriter
 func (g *ginGzipWriter) WriteHeader(code int) {
-	g.writerWrapper.WriteHeader(code)
+	g.wrapper.WriteHeader(code)
 }
 
 // WriteHeader implements interface gin.ResponseWriter
 func (g *ginGzipWriter) Header() http.Header {
-	return g.writerWrapper.Header()
+	return g.wrapper.Header()
 }
 
 // Flush implements http.Flusher
 func (g *ginGzipWriter) Flush() {
-	g.writerWrapper.Flush()
+	g.wrapper.Flush()
 }
 
 // Gin implement gin's middleware
@@ -173,8 +205,8 @@ func (h *Handler) Gin(c *gin.Context) {
 		wrapper.Reset(c.Writer)
 		originWriter := c.Writer
 		c.Writer = &ginGzipWriter{
-			ResponseWriter: c.Writer,
-			writerWrapper:  wrapper,
+			originWriter: c.Writer,
+			wrapper:      wrapper,
 		}
 		defer func() {
 			h.putWriteWrapper(wrapper)

@@ -177,15 +177,25 @@ func Test_writerWrapper_Write_big_part_by_part_and_reset(t *testing.T) {
 	require.Less(t, partial, minContentLength)
 
 	wrapper, recorder := newWrapper()
+	assert.EqualValues(t, wrapper.Status(), 0)
+	assert.EqualValues(t, wrapper.Size(), 0)
+	assert.False(t, wrapper.Written())
 
 	_, err := wrapper.Write(bigPayload[:partial])
 	assert.NoError(t, err)
 	assert.True(t, wrapper.shouldCompress)
 	assert.True(t, wrapper.responseHeaderChecked)
 	assert.False(t, wrapper.bodyBigEnough)
+	assert.EqualValues(t, wrapper.Status(), http.StatusOK)
+	assert.EqualValues(t, wrapper.Size(), partial)
+	assert.True(t, wrapper.Written())
 
 	_, err = wrapper.Write(bigPayload[partial:])
 	assert.NoError(t, err)
+	assert.EqualValues(t, wrapper.Status(), http.StatusOK)
+	assert.EqualValues(t, wrapper.Size(), len(bigPayload))
+	assert.True(t, wrapper.Written())
+
 	wrapper.FinishWriting()
 
 	result := recorder.Result()
@@ -199,6 +209,9 @@ func Test_writerWrapper_Write_big_part_by_part_and_reset(t *testing.T) {
 	wrapper.Reset(nil)
 	assert.EqualValues(t, minContentLength, cap(wrapper.bodyBuffer))
 	assert.EqualValues(t, 0, len(wrapper.bodyBuffer))
+	assert.EqualValues(t, wrapper.Status(), 0)
+	assert.EqualValues(t, wrapper.Size(), 0)
+	assert.False(t, wrapper.Written())
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
