@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const minContentLength = 100
+
 var bigPayload = []byte(`Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.
 
 Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this.
@@ -45,8 +47,6 @@ type DummyResFilter bool
 func (d DummyResFilter) ShouldCompress(_ http.Header) bool {
 	return bool(d)
 }
-
-const minContentLength = 100
 
 func newWrapper(filters ...ResponseHeaderFilter) (*writerWrapper, *httptest.ResponseRecorder) {
 	recorder := httptest.NewRecorder()
@@ -180,6 +180,10 @@ func Test_writerWrapper_Write_big_part_by_part_and_reset(t *testing.T) {
 
 	_, err := wrapper.Write(bigPayload[:partial])
 	assert.NoError(t, err)
+	assert.True(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.False(t, wrapper.bodyBigEnough)
+
 	_, err = wrapper.Write(bigPayload[partial:])
 	assert.NoError(t, err)
 	wrapper.FinishWriting()
