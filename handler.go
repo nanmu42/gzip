@@ -120,7 +120,7 @@ func (h *Handler) putWriteWrapper(w *writerWrapper) {
 		return
 	}
 
-	w.CleanUp()
+	w.FinishWriting()
 	w.OriginWriter = nil
 	h.wrapperPool.Put(w)
 }

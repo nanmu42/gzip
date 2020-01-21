@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var bigPayload = []byte(`Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.
@@ -74,6 +75,8 @@ func TestNewWriterWrapper_ShouldCompress_True(t *testing.T) {
 	)
 
 	assert.True(t, wrapper.shouldCompress)
+	assert.EqualValues(t, minContentLength, cap(wrapper.bodyBuffer))
+	assert.EqualValues(t, 0, len(wrapper.bodyBuffer))
 }
 
 func Test_writerWrapper_Header(t *testing.T) {
@@ -96,7 +99,7 @@ func Test_writerWrapper_WriteHeader_Twice(t *testing.T) {
 	wrapper.WriteHeader(http.StatusBadRequest)
 	wrapper.WriteHeader(http.StatusNotImplemented)
 
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 	result := recorder.Result()
 
 	assert.EqualValues(t, http.StatusBadRequest, result.StatusCode)
@@ -107,7 +110,7 @@ func Test_writerWrapper_WriteHeader_ShouldNotCompress(t *testing.T) {
 	wrapper.shouldCompress = false
 
 	wrapper.WriteHeader(http.StatusBadRequest)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 	result := recorder.Result()
 
 	assert.EqualValues(t, http.StatusBadRequest, result.StatusCode)
@@ -137,25 +140,61 @@ func Test_writerWrapper_Write_after_WriteHeader(t *testing.T) {
 	wrapper.WriteHeader(http.StatusConflict)
 	_, err := wrapper.Write(bigPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusConflict, result.StatusCode)
 }
 
 func Test_writerWrapper_Write_big(t *testing.T) {
-	assert.Greater(t, len(bigPayload), minContentLength)
+	require.Greater(t, len(bigPayload), minContentLength)
 
 	wrapper, recorder := newWrapper()
 
 	_, err := wrapper.Write(bigPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusOK, result.StatusCode)
 	assert.True(t, wrapper.shouldCompress)
-	assert.True(t, wrapper.didFirstWrite)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.True(t, wrapper.bodyBigEnough)
+	assert.EqualValues(t, minContentLength, cap(wrapper.bodyBuffer))
+	assert.EqualValues(t, 0, len(wrapper.bodyBuffer))
+
+	reader, err := gzip.NewReader(result.Body)
+	assert.NoError(t, err)
+	body, err := ioutil.ReadAll(reader)
+	assert.NoError(t, err)
+	assert.Equal(t, bigPayload, body)
+}
+
+func Test_writerWrapper_Write_big_part_by_part_and_reset(t *testing.T) {
+	const partial = 10
+
+	require.Greater(t, len(bigPayload), minContentLength)
+	require.Less(t, partial, minContentLength)
+
+	wrapper, recorder := newWrapper()
+
+	_, err := wrapper.Write(bigPayload[:partial])
+	assert.NoError(t, err)
+	_, err = wrapper.Write(bigPayload[partial:])
+	assert.NoError(t, err)
+	wrapper.FinishWriting()
+
+	result := recorder.Result()
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.True(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.True(t, wrapper.bodyBigEnough)
+	assert.EqualValues(t, minContentLength, cap(wrapper.bodyBuffer))
+	assert.EqualValues(t, partial, len(wrapper.bodyBuffer))
+
+	wrapper.Reset(nil)
+	assert.EqualValues(t, minContentLength, cap(wrapper.bodyBuffer))
+	assert.EqualValues(t, 0, len(wrapper.bodyBuffer))
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
@@ -171,12 +210,13 @@ func Test_writerWrapper_Write_big_all_yes(t *testing.T) {
 
 	_, err := wrapper.Write(bigPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusOK, result.StatusCode)
 	assert.True(t, wrapper.shouldCompress)
-	assert.True(t, wrapper.didFirstWrite)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.True(t, wrapper.bodyBigEnough)
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
@@ -190,12 +230,13 @@ func Test_writerWrapper_Write_big_filter_yes_no_yes(t *testing.T) {
 
 	_, err := wrapper.Write(bigPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusOK, result.StatusCode)
 	assert.False(t, wrapper.shouldCompress)
-	assert.True(t, wrapper.didFirstWrite)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.False(t, wrapper.bodyBigEnough)
 }
 
 func Test_writerWrapper_Write_big_filter_no_yes_no(t *testing.T) {
@@ -203,12 +244,13 @@ func Test_writerWrapper_Write_big_filter_no_yes_no(t *testing.T) {
 
 	_, err := wrapper.Write(bigPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusOK, result.StatusCode)
 	assert.False(t, wrapper.shouldCompress)
-	assert.True(t, wrapper.didFirstWrite)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.False(t, wrapper.bodyBigEnough)
 }
 
 func Test_writerWrapper_Write_big_filter_all_no(t *testing.T) {
@@ -216,12 +258,13 @@ func Test_writerWrapper_Write_big_filter_all_no(t *testing.T) {
 
 	_, err := wrapper.Write(bigPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusOK, result.StatusCode)
 	assert.False(t, wrapper.shouldCompress)
-	assert.True(t, wrapper.didFirstWrite)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.False(t, wrapper.bodyBigEnough)
 }
 
 func Test_writerWrapper_Write_small(t *testing.T) {
@@ -231,12 +274,13 @@ func Test_writerWrapper_Write_small(t *testing.T) {
 
 	_, err := wrapper.Write(smallPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusOK, result.StatusCode)
 	assert.False(t, wrapper.shouldCompress)
-	assert.True(t, wrapper.didFirstWrite)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.False(t, wrapper.bodyBigEnough)
 
 	body, err := ioutil.ReadAll(result.Body)
 	assert.NoError(t, err)
@@ -252,12 +296,13 @@ func Test_writerWrapper_Write_small_with_bigContentLength(t *testing.T) {
 
 	_, err := wrapper.Write(smallPayload)
 	assert.NoError(t, err)
-	wrapper.CleanUp()
+	wrapper.FinishWriting()
 
 	result := recorder.Result()
 	assert.EqualValues(t, http.StatusOK, result.StatusCode)
 	assert.True(t, wrapper.shouldCompress)
-	assert.True(t, wrapper.didFirstWrite)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.True(t, wrapper.bodyBigEnough)
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
