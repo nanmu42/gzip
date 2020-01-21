@@ -146,7 +146,12 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 
 	if !w.writeBuffer(data) {
 		w.bodyBigEnough = true
-		// TODO: detect Content-Type if there's none
+
+		// detect Content-Type if there's none
+		if header := w.Header(); header.Get("Content-Type") == "" {
+			header.Set("Content-Type", http.DetectContentType(w.bodyBuffer))
+		}
+
 		w.WriteHeaderNow()
 		w.initGzipWriter()
 		written, err := w.gzipWriter.Write(w.bodyBuffer)

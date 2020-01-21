@@ -332,3 +332,60 @@ func Test_writerWrapper_Write_small_with_bigContentLength(t *testing.T) {
 	assert.Equal(t, "Accept-Encoding", result.Header.Get("Vary"))
 	assert.Equal(t, "W/12345", result.Header.Get("ETag"))
 }
+
+func Test_writerWrapper_Write_content_type_sniff(t *testing.T) {
+	assert.Greater(t, len(bigPayload), minContentLength)
+
+	wrapper, recorder := newWrapper(DummyResFilter(true))
+
+	var err error
+
+	_, err = wrapper.Write([]byte("<html>"))
+	assert.NoError(t, err)
+	_, err = wrapper.Write(bigPayload)
+	assert.NoError(t, err)
+	_, err = wrapper.Write([]byte("</html>"))
+	assert.NoError(t, err)
+
+	wrapper.FinishWriting()
+
+	result := recorder.Result()
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.True(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.True(t, wrapper.bodyBigEnough)
+	assert.Equal(t, "text/html; charset=utf-8", result.Header.Get("Content-Type"))
+
+	reader, err := gzip.NewReader(result.Body)
+	assert.NoError(t, err)
+	_, err = ioutil.ReadAll(reader)
+	assert.NoError(t, err)
+}
+
+func Test_writerWrapper_Write_content_type_no_sniff(t *testing.T) {
+	const contentType = "text/special; charset=utf-8"
+
+	assert.Greater(t, len(bigPayload), minContentLength)
+
+	wrapper, recorder := newWrapper(DummyResFilter(true))
+
+	var err error
+	wrapper.Header().Set("Content-Type", contentType)
+	_, err = wrapper.Write(bigPayload)
+	assert.NoError(t, err)
+
+	wrapper.FinishWriting()
+
+	result := recorder.Result()
+	assert.EqualValues(t, http.StatusOK, result.StatusCode)
+	assert.True(t, wrapper.shouldCompress)
+	assert.True(t, wrapper.responseHeaderChecked)
+	assert.True(t, wrapper.bodyBigEnough)
+	assert.Equal(t, contentType, result.Header.Get("Content-Type"))
+
+	reader, err := gzip.NewReader(result.Body)
+	assert.NoError(t, err)
+	body, err := ioutil.ReadAll(reader)
+	assert.NoError(t, err)
+	assert.Equal(t, bigPayload, body)
+}
