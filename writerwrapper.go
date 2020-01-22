@@ -136,7 +136,7 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 			}
 		}
 
-		if w.enoughContentLength(data) {
+		if w.enoughContentLength() {
 			w.bodyBigEnough = true
 			w.WriteHeaderNow()
 			w.initGzipWriter()
@@ -174,7 +174,7 @@ func (w *writerWrapper) writeBuffer(data []byte) (fit bool) {
 	return true
 }
 
-func (w *writerWrapper) enoughContentLength(data []byte) bool {
+func (w *writerWrapper) enoughContentLength() bool {
 	var (
 		header        = w.Header()
 		_, haveCl     = header["Content-Length"]
@@ -182,8 +182,6 @@ func (w *writerWrapper) enoughContentLength(data []byte) bool {
 	)
 	if haveCl {
 		contentLength, _ = strconv.ParseInt(header.Get("Content-Length"), 10, 64)
-	} else {
-		contentLength = int64(len(data))
 	}
 
 	if contentLength != 0 && contentLength >= w.MinContentLength {
