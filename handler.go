@@ -31,9 +31,12 @@ type Config struct {
 	// Minimum content length to trigger gzip,
 	// the unit is in byte.
 	//
-	// Content length is obtained in response's header,
-	// and len(data) of http.ResponseWriter.Write(data []byte)'s first calling
-	// if header["Content-Length"] is not available.
+	// When `Content-Length` is not available, handler may buffer your writes to
+	// decide if its big enough to do a meaningful compression.
+	// A high `MinContentLength` may bring memory overhead,
+	// although the handler tries to be smart by reusing buffers
+	// and testing if `len(data)` of the first
+	// `http.ResponseWriter.Write(data []byte)` calling suffices or not.
 	MinContentLength int64
 	// Filters are applied in the sequence here
 	RequestFilter []RequestFilter

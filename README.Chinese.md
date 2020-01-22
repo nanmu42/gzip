@@ -8,7 +8,7 @@
 [![Lint status](https://github.com/nanmu42/gzip/workflows/golangci-lint/badge.svg)](https://github.com/nanmu42/gzip/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nanmu42/gzip)](https://goreportcard.com/report/github.com/nanmu42/gzip)
 
-一个智能、高效、开箱即用、可定制的，适用于[Gin](https://github.com/gin-gonic/gin)和[net/http](https://golang.org/pkg/net/http/)的gzip中间件。
+一个开箱即用，可定制，适用于[Gin](https://github.com/gin-gonic/gin)和[net/http](https://golang.org/pkg/net/http/)的gzip中间件。
 
 # 使用示例
 
@@ -89,7 +89,7 @@ handler := gzip.NewHandler(gzip.Config{
 
 # 效率
 
-本中间件经过了性能调优，以保证高效运行，[查看benchmark](https://github.com/nanmu42/gzip/blob/master/docs/benchmarks.md)。
+本中间件经过了性能调优，以确保高效运行，[查看benchmark](https://github.com/nanmu42/gzip/blob/master/docs/benchmarks.md)。
 
 # 局限性
 

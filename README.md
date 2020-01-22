@@ -1,6 +1,6 @@
 **English** | [中文](https://github.com/nanmu42/gzip/blob/master/README.Chinese.md)
 
-# gzip
+# Gzip Middleware for Go
 
 [![GoDoc](https://godoc.org/github.com/nanmu42/gzip?status.svg)](https://godoc.org/github.com/nanmu42/gzip)
 [![Build status](https://github.com/nanmu42/gzip/workflows/build/badge.svg)](https://github.com/nanmu42/gzip/actions)
@@ -8,7 +8,7 @@
 [![Lint status](https://github.com/nanmu42/gzip/workflows/golangci-lint/badge.svg)](https://github.com/nanmu42/gzip/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nanmu42/gzip)](https://goreportcard.com/report/github.com/nanmu42/gzip)
 
-Finally, a smart, efficient, out-of-the-box yet customizable gzip middleware for [Gin](https://github.com/gin-gonic/gin) and [net/http](https://golang.org/pkg/net/http/).
+An out-of-the-box, also customizable gzip middleware for [Gin](https://github.com/gin-gonic/gin) and [net/http](https://golang.org/pkg/net/http/).
 
 # Examples
 
@@ -93,7 +93,7 @@ This middleware is fine-tuned so that little overhead is added to your program. 
 # Limitation
 
 * You should always provide a `Content-Type` in http response's header, though handler guesses by `http.DetectContentType()`as makeshift;
-* When `Content-Length` is not available, handler may buffer your writes to decide if its big enough to do a meaningful compression. A high `MinContentLength` may bring memory overhead, although the handler tries to be smart by reuse buffers and tests if `len(data)` of the first `http.ResponseWriter.Write(data []byte)` calling suffices or not.
+* When `Content-Length` is not available, handler may buffer your writes to decide if its big enough to do a meaningful compression. A high `MinContentLength` may bring memory overhead, although the handler tries to be smart by reusing buffers and testing if `len(data)` of the first `http.ResponseWriter.Write(data []byte)` calling suffices or not.
 
 # Status: v0
 
