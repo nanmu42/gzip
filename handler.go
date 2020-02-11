@@ -85,7 +85,7 @@ func NewHandler(config Config) *Handler {
 
 var defaultConfig = Config{
 	CompressionLevel: 6,
-	MinContentLength: 256,
+	MinContentLength: 1 * 1024,
 	RequestFilter: []RequestFilter{
 		NewCommonRequestFilter(),
 		DefaultExtensionFilter(),
