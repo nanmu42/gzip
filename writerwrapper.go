@@ -195,8 +195,16 @@ func (w *writerWrapper) enoughContentLength() bool {
 //
 // WriteHeader does not really calls originalHandler's WriteHeader,
 // and the calling will actually be handler by WriteHeaderNow().
+//
+// http.ResponseWriter does not specify clearly whether permitting
+// updating status code on second call to WriteHeader(), and it's
+// conflicting between http and gin's implementation.
+// Here, gzip consider second(and furthermore) calls to WriteHeader()
+// valid. WriteHeader() is disabled after flushing header.
+// Do note setting status code to 204 or 304 marks content uncompressable,
+// and a later status code change does not revert this.
 func (w *writerWrapper) WriteHeader(statusCode int) {
-	if w.WriteHeaderCalled() {
+	if w.headerFlushed {
 		return
 	}
 

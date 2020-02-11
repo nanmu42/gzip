@@ -102,7 +102,7 @@ func Test_writerWrapper_WriteHeader_Twice(t *testing.T) {
 	wrapper.FinishWriting()
 	result := recorder.Result()
 
-	assert.EqualValues(t, http.StatusBadRequest, result.StatusCode)
+	assert.EqualValues(t, http.StatusNotImplemented, result.StatusCode)
 }
 
 func Test_writerWrapper_WriteHeader_ShouldNotCompress(t *testing.T) {
