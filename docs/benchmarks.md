@@ -102,3 +102,7 @@ BenchmarkGinWithDefaultHandler_BigPayload-12             2911062               4
 PASS
 ok      github.com/nanmu42/gzip 6.634s
 ```
+
+# v0.8.0
+
+v0.8.0 considers second(and furthermore) calls to writeWrapper's WriteHeader() valid
