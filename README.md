@@ -67,7 +67,7 @@ handler := gzip.NewHandler(gzip.Config{
     // gzip compression level to use
 	CompressionLevel: 6,
     // minimum content length to trigger gzip, the unit is in byte.
-	MinContentLength: 256,
+	MinContentLength: 1024,
     // RequestFilter decide whether or not to compress response judging by request.
     // Filters are applied in the sequence here.
 	RequestFilter: []RequestFilter{
@@ -95,9 +95,9 @@ This middleware is fine-tuned so that little overhead is added to your program. 
 * You should always provide a `Content-Type` in http response's header, though handler guesses by `http.DetectContentType()`as makeshift;
 * When `Content-Length` is not available, handler may buffer your writes to decide if its big enough to do a meaningful compression. A high `MinContentLength` may bring memory overhead, although the handler tries to be smart by reusing buffers and testing if `len(data)` of the first `http.ResponseWriter.Write(data []byte)` calling suffices or not.
 
-# Status: v0
+# Status: Beta
 
-API not stabilized, things may breaks.
+API is almost stabilized, but stability is not guaranteed for now.
 
 You are welcome to try gzip on your test/unimportant environments.
 

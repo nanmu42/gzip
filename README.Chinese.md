@@ -68,8 +68,8 @@ import github.com/nanmu42/gzip
 handler := gzip.NewHandler(gzip.Config{
     // gzip压缩等级
 	CompressionLevel: 6,
-    // 使用gzip的最小body体积，单位：byte
-	MinContentLength: 256,
+    // 触发gzip的最小body体积，单位：byte
+	MinContentLength: 1024,
     // 请求过滤器基于请求来判断是否对这条请求的返回启用gzip，
     // 过滤器按其定义顺序执行，下同。
 	RequestFilter: []RequestFilter{
@@ -96,9 +96,11 @@ handler := gzip.NewHandler(gzip.Config{
 * 你应该总是在返回中提供`Content-Type`。虽然Handler会在`Content-Type`缺失时使用`http.DetectContentType()`进行猜测，但是效果并没有那么好；
 * 返回的`Content-Length` 缺失时，Handler可能会缓冲返回的报文数据以决定报文是否大到值得进行压缩，如果`MinContentLength`设置得太大，这个过程可能会带来内存压力。Handler针对这个情况做了一些优化，例如查看`http.ResponseWriter.Write(data []byte)`在首次调用时的 `len(data)`，以及资源复用。
 
-# 项目状态：v0
+# 项目状态：Beta
 
-API可能会在未来变更。代码也许会爆炸。
+API基本稳定，但仍可能变更。
+
+代码可用于测试环境，但需要格外关注其表现。
 
 欢迎在测试环境或不重要的环境使用本项目。
 
