@@ -112,6 +112,8 @@ During the development of this work, the author took following works/materials a
 * https://blog.cloudflare.com/results-experimenting-brotli/
 * https://support.cloudflare.com/hc/en-us/articles/200168396-What-will-Cloudflare-compress-
 
+Logo generated at [Gopherize.me](https://gopherize.me/).
+
 # License
 
 ```

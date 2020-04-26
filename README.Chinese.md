@@ -111,6 +111,8 @@ API已经稳定，`1.x`版本中的更新会向前兼容。
 * https://blog.cloudflare.com/results-experimenting-brotli/
 * https://support.cloudflare.com/hc/en-us/articles/200168396-What-will-Cloudflare-compress-
 
+Logo在[Gopherize.me](https://gopherize.me/)生成。
+
 # License
 
 ```
