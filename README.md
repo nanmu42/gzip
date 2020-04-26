@@ -10,7 +10,11 @@
 
 An out-of-the-box, also customizable gzip middleware for [Gin](https://github.com/gin-gonic/gin) and [net/http](https://golang.org/pkg/net/http/).
 
+![Golang Gzip Middleware](https://repository-images.githubusercontent.com/226004454/598f2e80-87a9-11ea-8c80-ecfc0e85fef5)
+
 # Examples
+
+Use `DefaultHandler()` to create a ready-to-go gzip middleware.
 
 ## Gin
 
@@ -58,7 +62,7 @@ func writeString(w http.ResponseWriter, payload string) {
 
 ## Customize Handler
 
-Handler can be customized during initialization:
+Handler can be customized using `NewHandler` and `Config`:
 
 ```go
 import github.com/nanmu42/gzip
@@ -75,7 +79,7 @@ handler := gzip.NewHandler(gzip.Config{
 	    DefaultExtensionFilter(),
 	},
     // ResponseHeaderFilter decide whether or not to compress response
-    // judging by request
+    // judging by response header
 	ResponseHeaderFilter: []ResponseHeaderFilter{
 		NewSkipCompressedFilter(),
 		DefaultContentTypeFilter(),
@@ -95,13 +99,9 @@ This middleware is fine-tuned so that little overhead is added to your program. 
 * You should always provide a `Content-Type` in http response's header, though handler guesses by `http.DetectContentType()`as makeshift;
 * When `Content-Length` is not available, handler may buffer your writes to decide if its big enough to do a meaningful compression. A high `MinContentLength` may bring memory overhead, although the handler tries to be smart by reusing buffers and testing if `len(data)` of the first `http.ResponseWriter.Write(data []byte)` calling suffices or not.
 
-# Status: Beta
+# Status: Stable
 
-API is almost stabilized, but stability is not guaranteed for now.
-
-You are welcome to try gzip on your test/unimportant environments.
-
-Pull requests and issues are welcome.
+All APIs are finalized, and no breaking changes will be made in the 1.x series of releases.
 
 # Acknowledgement
 
