@@ -69,7 +69,7 @@ import github.com/nanmu42/gzip
 
 handler := gzip.NewHandler(gzip.Config{
     // gzip compression level to use
-	CompressionLevel: 6,
+	CompressionLevel: 6, 
     // minimum content length to trigger gzip, the unit is in byte.
 	MinContentLength: 1024,
     // RequestFilter decide whether or not to compress response judging by request.
