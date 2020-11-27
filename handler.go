@@ -19,12 +19,18 @@ const (
 	BestCompression    = gzip.BestCompression
 	DefaultCompression = gzip.DefaultCompression
 	HuffmanOnly        = gzip.HuffmanOnly
+	// Stateless will do compression but without maintaining any state
+	// between Write calls, so long running responses will not take memory.
+	// There will be no memory kept between Write calls,
+	// but compression and speed will be suboptimal.
+	// Because of this, the size of actual Write calls will affect output size.
+	Stateless = gzip.StatelessCompression
 )
 
 // Config is used in Handler initialization
 type Config struct {
 	// gzip compression level to use,
-	// valid value: -2 ~ 9.
+	// valid value: -3 => 9.
 	//
 	// see https://golang.org/pkg/compress/gzip/#NewWriterLevel
 	CompressionLevel int
@@ -58,7 +64,7 @@ type Handler struct {
 //
 // config must not be modified after calling on NewHandler()
 func NewHandler(config Config) *Handler {
-	if config.CompressionLevel < HuffmanOnly || config.CompressionLevel > BestCompression {
+	if config.CompressionLevel < Stateless || config.CompressionLevel > BestCompression {
 		panic(fmt.Sprintf("gzip: invalid CompressionLevel: %d", config.CompressionLevel))
 	}
 	if config.MinContentLength <= 0 {
