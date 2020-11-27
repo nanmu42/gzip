@@ -1,7 +1,6 @@
 package gzip
 
 import (
-	"compress/gzip"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

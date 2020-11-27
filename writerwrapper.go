@@ -1,11 +1,12 @@
 package gzip
 
 import (
-	"compress/gzip"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/klauspost/compress/gzip"
 )
 
 // writerWrapper wraps the originalHandler
@@ -154,10 +155,12 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 
 		w.WriteHeaderNow()
 		w.initGzipWriter()
-		written, err := w.gzipWriter.Write(w.bodyBuffer)
-		if err != nil {
-			err = fmt.Errorf("w.gzipWriter.Write: %w", err)
-			return written, err
+		if len(w.bodyBuffer) > 0 {
+			written, err := w.gzipWriter.Write(w.bodyBuffer)
+			if err != nil {
+				err = fmt.Errorf("w.gzipWriter.Write: %w", err)
+				return written, err
+			}
 		}
 		return w.gzipWriter.Write(data)
 	}

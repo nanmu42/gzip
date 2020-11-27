@@ -2,7 +2,6 @@ package gzip
 
 import (
 	"bufio"
-	"compress/gzip"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -10,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/klauspost/compress/gzip"
 )
 
 // These constants are copied from the gzip package

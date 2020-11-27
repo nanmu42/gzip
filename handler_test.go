@@ -150,7 +150,12 @@ func BenchmarkSoleGin_SmallPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
@@ -170,7 +175,12 @@ func BenchmarkGinWithDefaultHandler_SmallPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
@@ -190,7 +200,12 @@ func BenchmarkSoleGin_BigPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
@@ -210,7 +225,12 @@ func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
