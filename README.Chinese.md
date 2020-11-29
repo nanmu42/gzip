@@ -91,7 +91,23 @@ handler := gzip.NewHandler(gzip.Config{
 
 # 效率
 
-本中间件经过了性能调优，以确保高效运行，[查看benchmark](https://github.com/nanmu42/gzip/blob/master/docs/benchmarks.md)。
+* 当返回体积不大时，Handler会智能地跳过压缩，这个过程带来的代价可以忽略不记；
+* 当返回体积足够大时，Handler会进行gzip压缩，这个过程有着合理的代价。
+
+```
+$ go test -benchmem -bench .
+goos: linux
+goarch: amd64
+pkg: github.com/nanmu42/gzip
+BenchmarkSoleGin_SmallPayload-4                          4104684               276 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_SmallPayload-4            1683307               707 ns/op              96 B/op          3 allocs/op
+BenchmarkSoleGin_BigPayload-4                            4198786               274 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_BigPayload-4                44780             27636 ns/op             190 B/op          5 allocs/op
+PASS
+ok      github.com/nanmu42/gzip 6.373s
+```
+
+注：由于[一个笨拙的人为错误](https://github.com/nanmu42/gzip/pull/3#issuecomment-735352715)，`v1.0.0`以及更早版本的评测指标是错误的，不具有参考意义。
 
 # 局限性
 
@@ -110,6 +126,8 @@ API已经稳定，`1.x`版本中的更新会向前兼容。
 * https://github.com/gin-contrib/gzip (MIT License)
 * https://blog.cloudflare.com/results-experimenting-brotli/
 * https://support.cloudflare.com/hc/en-us/articles/200168396-What-will-Cloudflare-compress-
+
+本项目使用[klauspost的compress库](https://github.com/klauspost/compress)中的gzip压缩实现。
 
 Logo在[Gopherize.me](https://gopherize.me/)生成。
 

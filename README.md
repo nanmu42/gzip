@@ -92,7 +92,23 @@ You may define one that specially suits your need.
 
 # Performance
 
-This middleware is fine-tuned so that little overhead is added to your program. See [benchmarks](https://github.com/nanmu42/gzip/blob/master/docs/benchmarks.md).
+* When response payload is small, the handler is smart enough to skip compression automatically, which takes neglectable overhead.
+* At the time when the payload is big enough, gzip kicks in and there is a reasonable price.
+
+```
+$ go test -benchmem -bench .
+goos: linux
+goarch: amd64
+pkg: github.com/nanmu42/gzip
+BenchmarkSoleGin_SmallPayload-4                          4104684               276 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_SmallPayload-4            1683307               707 ns/op              96 B/op          3 allocs/op
+BenchmarkSoleGin_BigPayload-4                            4198786               274 ns/op              64 B/op          2 allocs/op
+BenchmarkGinWithDefaultHandler_BigPayload-4                44780             27636 ns/op             190 B/op          5 allocs/op
+PASS
+ok      github.com/nanmu42/gzip 6.373s
+```
+
+Note: due to [an awkward man-mistake](https://github.com/nanmu42/gzip/pull/3#issuecomment-735352715), benchmark of and before `v1.0.0` are not accurate.
 
 # Limitation
 
@@ -111,6 +127,8 @@ During the development of this work, the author took following works/materials a
 * https://github.com/gin-contrib/gzip (MIT License)
 * https://blog.cloudflare.com/results-experimenting-brotli/
 * https://support.cloudflare.com/hc/en-us/articles/200168396-What-will-Cloudflare-compress-
+
+This package uses [klauspost's compress package](https://github.com/klauspost/compress) to handle gzip compression.
 
 Logo generated at [Gopherize.me](https://gopherize.me/).
 
