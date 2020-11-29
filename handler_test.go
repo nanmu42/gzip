@@ -113,7 +113,7 @@ func TestNewHandler_Checks(t *testing.T) {
 
 	assert.Panics(t, func() {
 		NewHandler(Config{
-			CompressionLevel: -3,
+			CompressionLevel: -4,
 			MinContentLength: 100,
 		})
 	})
@@ -150,7 +150,12 @@ func BenchmarkSoleGin_SmallPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
@@ -170,7 +175,12 @@ func BenchmarkGinWithDefaultHandler_SmallPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
@@ -190,7 +200,12 @@ func BenchmarkSoleGin_BigPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
@@ -210,7 +225,12 @@ func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 	r.Header.Set("Accept-Encoding", "gzip")
 
 	b.ResetTimer()
+	h := map[string][]string(w.header)
 	for i := 0; i < b.N; i++ {
+		// Delete header between calls.
+		for k := range h {
+			delete(h, k)
+		}
 		g.ServeHTTP(w, r)
 	}
 
@@ -261,6 +281,39 @@ func TestGinWithDefaultHandler(t *testing.T) {
 			body, err := ioutil.ReadAll(reader)
 			require.NoError(t, err)
 			require.True(t, bytes.HasPrefix(body, []byte(seq)))
+		})
+	}
+}
+
+func TestGinWithLevelsHandler(t *testing.T) {
+	for i := Stateless; i < 10; i++ {
+		var seq = "level_" + strconv.Itoa(i)
+		i := i
+		t.Run(seq, func(t *testing.T) {
+			g := newEchoGinInstance(bigPayload, NewHandler(Config{
+				CompressionLevel: i,
+				MinContentLength: 1,
+			}).Gin)
+
+			var (
+				w = httptest.NewRecorder()
+				r = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(seq))
+			)
+
+			r.Header.Set("Accept-Encoding", "gzip")
+			g.ServeHTTP(w, r)
+
+			result := w.Result()
+			require.EqualValues(t, http.StatusOK, result.StatusCode)
+			require.Equal(t, "gzip", result.Header.Get("Content-Encoding"))
+			comp, err := ioutil.ReadAll(result.Body)
+			require.NoError(t, err)
+			reader, err := gzip.NewReader(bytes.NewReader(comp))
+			require.NoError(t, err)
+			body, err := ioutil.ReadAll(reader)
+			require.NoError(t, err)
+			require.True(t, bytes.HasPrefix(body, []byte(seq)))
+			t.Logf("%s: compressed %d => %d", seq, len(body), len(comp))
 		})
 	}
 }
