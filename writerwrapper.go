@@ -178,15 +178,10 @@ func (w *writerWrapper) writeBuffer(data []byte) (fit bool) {
 }
 
 func (w *writerWrapper) enoughContentLength() bool {
-	var (
-		header        = w.Header()
-		_, haveCl     = header["Content-Length"]
-		contentLength int64
-	)
-	if haveCl {
-		contentLength, _ = strconv.ParseInt(header.Get("Content-Length"), 10, 64)
+	contentLength, err := strconv.ParseInt(w.Header().Get("Content-Length"), 10, 64)
+	if err != nil {
+		return false
 	}
-
 	if contentLength != 0 && contentLength >= w.MinContentLength {
 		return true
 	}
