@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/nanmu42/gzip"
+	adaptor "github.com/nanmu42/gzip/adaptors/gin/v2"
+	"github.com/nanmu42/gzip/v2"
 )
 
 func main() {
 	g := gin.Default()
 
-	g.Use(gzip.DefaultHandler().Gin)
+	g.Use(adaptor.Adapt(gzip.DefaultHandler()))
 
 	g.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, map[string]interface{}{

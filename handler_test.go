@@ -10,44 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const handlerTestSize = 256
-
-func newGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
-	gin.SetMode(gin.ReleaseMode)
-
-	g := gin.New()
-	g.HandleMethodNotAllowed = true
-	g.Use(middleware...)
-
-	g.POST("/", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/plain; charset=utf8", payload)
-	})
-
-	return g
-}
-
-func newEchoGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
-	gin.SetMode(gin.ReleaseMode)
-
-	g := gin.New()
-	g.Use(middleware...)
-
-	g.POST("/", func(c *gin.Context) {
-		var buf bytes.Buffer
-
-		_, _ = io.Copy(&buf, c.Request.Body)
-		_, _ = buf.Write(payload)
-
-		c.Data(http.StatusOK, "text/plain; charset=utf8", buf.Bytes())
-	})
-
-	return g
-}
 
 func newHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Handler) http.Handler {
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -62,7 +29,7 @@ func newHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Han
 	return handler
 }
 
-func newEchoHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Handler) http.Handler {
+func newHTTPEchoInstance(payload []byte, wrapper ...func(next http.Handler) http.Handler) http.Handler {
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 
@@ -139,9 +106,9 @@ func TestNewHandler_Checks(t *testing.T) {
 	})
 }
 
-func BenchmarkSoleGin_SmallPayload(b *testing.B) {
+func BenchmarkSoleHTTP_SmallPayload(b *testing.B) {
 	var (
-		g = newGinInstance(smallPayload)
+		g = newHTTPInstance(smallPayload)
 		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
@@ -164,9 +131,9 @@ func BenchmarkSoleGin_SmallPayload(b *testing.B) {
 	}
 }
 
-func BenchmarkGinWithDefaultHandler_SmallPayload(b *testing.B) {
+func BenchmarkHTTPWithDefaultHandler_SmallPayload(b *testing.B) {
 	var (
-		g = newGinInstance(smallPayload, DefaultHandler().Gin)
+		g = newHTTPInstance(smallPayload, DefaultHandler().WrapHandler)
 		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
@@ -191,7 +158,7 @@ func BenchmarkGinWithDefaultHandler_SmallPayload(b *testing.B) {
 
 func BenchmarkSoleGin_BigPayload(b *testing.B) {
 	var (
-		g = newGinInstance(bigPayload)
+		g = newHTTPInstance(bigPayload)
 		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
@@ -216,7 +183,7 @@ func BenchmarkSoleGin_BigPayload(b *testing.B) {
 
 func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 	var (
-		g = newGinInstance(bigPayload, DefaultHandler().Gin)
+		g = newHTTPInstance(bigPayload, DefaultHandler().WrapHandler)
 		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = NewNopWriter()
 	)
@@ -237,118 +204,6 @@ func BenchmarkGinWithDefaultHandler_BigPayload(b *testing.B) {
 	if encoding := w.Header().Get("Content-Encoding"); encoding != "gzip" {
 		b.Fatalf("Content-Encoding is not gzip, but %q", encoding)
 	}
-}
-
-func TestSoloGinHandler(t *testing.T) {
-	var (
-		g = newGinInstance(bigPayload)
-		r = httptest.NewRequest(http.MethodPost, "/", nil)
-		w = NewNopWriter()
-	)
-
-	r.Header.Set("Accept-Encoding", "gzip")
-
-	g.ServeHTTP(w, r)
-
-	assert.Empty(t, w.Header().Get("Content-Encoding"))
-}
-
-func TestGinWithDefaultHandler(t *testing.T) {
-	var (
-		g = newEchoGinInstance(bigPayload, DefaultHandler().Gin)
-	)
-
-	for i := 0; i < handlerTestSize; i++ {
-		var seq = strconv.Itoa(i)
-		t.Run(seq, func(t *testing.T) {
-			t.Parallel()
-
-			var (
-				w = httptest.NewRecorder()
-				r = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(seq))
-			)
-
-			r.Header.Set("Accept-Encoding", "gzip")
-			g.ServeHTTP(w, r)
-
-			result := w.Result()
-			require.EqualValues(t, http.StatusOK, result.StatusCode)
-			require.Equal(t, "gzip", result.Header.Get("Content-Encoding"))
-
-			reader, err := gzip.NewReader(result.Body)
-			require.NoError(t, err)
-			body, err := io.ReadAll(reader)
-			require.NoError(t, err)
-			require.True(t, bytes.HasPrefix(body, []byte(seq)))
-		})
-	}
-}
-
-func TestGinWithLevelsHandler(t *testing.T) {
-	for i := Stateless; i < 10; i++ {
-		var seq = "level_" + strconv.Itoa(i)
-		i := i
-		t.Run(seq, func(t *testing.T) {
-			g := newEchoGinInstance(bigPayload, NewHandler(Config{
-				CompressionLevel: i,
-				MinContentLength: 1,
-			}).Gin)
-
-			var (
-				w = httptest.NewRecorder()
-				r = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(seq))
-			)
-
-			r.Header.Set("Accept-Encoding", "gzip")
-			g.ServeHTTP(w, r)
-
-			result := w.Result()
-			require.EqualValues(t, http.StatusOK, result.StatusCode)
-			require.Equal(t, "gzip", result.Header.Get("Content-Encoding"))
-			comp, err := io.ReadAll(result.Body)
-			require.NoError(t, err)
-			reader, err := gzip.NewReader(bytes.NewReader(comp))
-			require.NoError(t, err)
-			body, err := io.ReadAll(reader)
-			require.NoError(t, err)
-			require.True(t, bytes.HasPrefix(body, []byte(seq)))
-			t.Logf("%s: compressed %d => %d", seq, len(body), len(comp))
-		})
-	}
-}
-
-func TestGinWithDefaultHandler_404(t *testing.T) {
-	var (
-		g = newGinInstance(bigPayload, DefaultHandler().Gin)
-		r = httptest.NewRequest(http.MethodPost, "/404", nil)
-		w = httptest.NewRecorder()
-	)
-
-	r.Header.Set("Accept-Encoding", "gzip")
-
-	g.ServeHTTP(w, r)
-
-	result := w.Result()
-
-	assert.EqualValues(t, http.StatusNotFound, result.StatusCode)
-	assert.Equal(t, "404 page not found", w.Body.String())
-}
-
-func TestGinWithDefaultHandler_405(t *testing.T) {
-	var (
-		g = newGinInstance(bigPayload, DefaultHandler().Gin)
-		r = httptest.NewRequest(http.MethodPatch, "/", nil)
-		w = httptest.NewRecorder()
-	)
-
-	r.Header.Set("Accept-Encoding", "gzip")
-
-	g.ServeHTTP(w, r)
-
-	result := w.Result()
-
-	assert.EqualValues(t, http.StatusMethodNotAllowed, result.StatusCode)
-	assert.Equal(t, "405 method not allowed", w.Body.String())
 }
 
 func TestHTTPWithDefaultHandler_404(t *testing.T) {
@@ -387,7 +242,7 @@ func TestSoloHTTP(t *testing.T) {
 
 func TestHTTPWithDefaultHandler(t *testing.T) {
 	var (
-		g = newEchoHTTPInstance(bigPayload, DefaultHandler().WrapHandler)
+		g = newHTTPEchoInstance(bigPayload, DefaultHandler().WrapHandler)
 	)
 
 	for i := 0; i < handlerTestSize; i++ {
@@ -463,54 +318,4 @@ func TestHTTPWithDefaultHandler_TinyPayload_WriteThreeTimes(t *testing.T) {
 	assert.Empty(t, result.Header.Get("Vary"))
 	assert.Empty(t, result.Header.Get("Content-Encoding"))
 	assert.Equal(t, "part 1\npart 2\npart 3\n", w.Body.String())
-}
-
-func TestGinCORSMiddleware(t *testing.T) {
-	var (
-		g = newGinInstance(bigPayload, DefaultHandler().Gin, corsMiddleware)
-		r = httptest.NewRequest(http.MethodOptions, "/", nil)
-		w = httptest.NewRecorder()
-	)
-
-	g.ServeHTTP(w, r)
-	result := w.Result()
-
-	assert.EqualValues(t, http.StatusNoContent, result.StatusCode)
-	assert.Equal(t, "*", result.Header.Get("Access-Control-Allow-Origin"))
-	assert.Equal(t, "POST", result.Header.Get("Access-Control-Allow-Methods"))
-	assert.EqualValues(t, 0, w.Body.Len())
-}
-
-func TestGinCORSMiddlewareWithDummyConfig(t *testing.T) {
-	var (
-		g = newGinInstance(bigPayload, NewHandler(Config{
-			CompressionLevel:     DefaultCompression,
-			MinContentLength:     100,
-			RequestFilter:        nil,
-			ResponseHeaderFilter: nil,
-		}).Gin, corsMiddleware)
-		r = httptest.NewRequest(http.MethodOptions, "/", nil)
-		w = httptest.NewRecorder()
-	)
-
-	g.ServeHTTP(w, r)
-	result := w.Result()
-
-	assert.EqualValues(t, http.StatusNoContent, result.StatusCode)
-	assert.Equal(t, "*", result.Header.Get("Access-Control-Allow-Origin"))
-	assert.Equal(t, "POST", result.Header.Get("Access-Control-Allow-Methods"))
-	assert.EqualValues(t, 0, w.Body.Len())
-}
-
-// corsMiddleware allows CORS request
-func corsMiddleware(c *gin.Context) {
-	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	c.Writer.Header().Set("Access-Control-Allow-Methods", "POST")
-
-	if c.Request.Method == http.MethodOptions {
-		c.AbortWithStatus(http.StatusNoContent)
-		return
-	}
-
-	c.Next()
 }

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nanmu42/gzip"
+	"github.com/nanmu42/gzip/v2"
 )
 
 func main() {

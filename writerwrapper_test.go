@@ -48,7 +48,7 @@ func (d DummyResFilter) ShouldCompress(_ http.Header) bool {
 	return bool(d)
 }
 
-func newWrapper(filters ...ResponseHeaderFilter) (*writerWrapper, *httptest.ResponseRecorder) {
+func newWrapper(filters ...ResponseHeaderFilter) (*WriterWrapper, *httptest.ResponseRecorder) {
 	recorder := httptest.NewRecorder()
 	return newWriterWrapper(
 		filters,

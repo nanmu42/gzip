@@ -1,14 +1,11 @@
 package gzip
 
 import (
-	"bufio"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"sync"
 
-	"github.com/gin-gonic/gin"
 	"github.com/klauspost/compress/gzip"
 )
 
@@ -32,7 +29,7 @@ type Config struct {
 	// gzip compression level to use,
 	// valid value: -3 => 9.
 	//
-	// see https://golang.org/pkg/compress/gzip/#NewWriterLevel
+	// see https://pkg.go.dev/github.com/klauspost/compress/gzip
 	CompressionLevel int
 	// Minimum content length to trigger gzip,
 	// the unit is in byte.
@@ -122,11 +119,17 @@ func (h *Handler) putGzipWriter(w *gzip.Writer) {
 	h.gzipWriterPool.Put(w)
 }
 
-func (h *Handler) getWriteWrapper() *writerWrapper {
-	return h.wrapperPool.Get().(*writerWrapper)
+// GetWriteWrapper provides a *writerWrapper,
+// which must be later returned to the pool by PutWriteWrapper().
+//
+// This method should only be used for building framework adaptors.
+func (h *Handler) GetWriteWrapper() *WriterWrapper {
+	return h.wrapperPool.Get().(*WriterWrapper)
 }
 
-func (h *Handler) putWriteWrapper(w *writerWrapper) {
+// PutWriteWrapper puts provided *writerWrapper back to the pool.
+// User must not hold the reference of a returned *writerWrapper.
+func (h *Handler) PutWriteWrapper(w *WriterWrapper) {
 	if w == nil {
 		return
 	}
@@ -136,115 +139,32 @@ func (h *Handler) putWriteWrapper(w *writerWrapper) {
 	h.wrapperPool.Put(w)
 }
 
-type ginGzipWriter struct {
-	wrapper      *writerWrapper
-	originWriter gin.ResponseWriter
-}
-
-// interface guard
-var _ gin.ResponseWriter = (*ginGzipWriter)(nil)
-
-func (g *ginGzipWriter) WriteHeaderNow() {
-	g.wrapper.WriteHeaderNow()
-}
-
-func (g *ginGzipWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return g.originWriter.Hijack()
-}
-
-func (g *ginGzipWriter) CloseNotify() <-chan bool {
-	return g.originWriter.CloseNotify()
-}
-
-func (g *ginGzipWriter) Status() int {
-	return g.wrapper.Status()
-}
-
-func (g *ginGzipWriter) Size() int {
-	return g.wrapper.Size()
-}
-
-func (g *ginGzipWriter) Written() bool {
-	return g.wrapper.Written()
-}
-
-func (g *ginGzipWriter) Pusher() http.Pusher {
-	// TODO: not sure how to implement gzip for HTTP2
-	return nil
-}
-
-// WriteString implements interface gin.ResponseWriter
-func (g *ginGzipWriter) WriteString(s string) (int, error) {
-	return g.wrapper.Write([]byte(s))
-}
-
-// Write implements interface gin.ResponseWriter
-func (g *ginGzipWriter) Write(data []byte) (int, error) {
-	return g.wrapper.Write(data)
-}
-
-// WriteHeader implements interface gin.ResponseWriter
-func (g *ginGzipWriter) WriteHeader(code int) {
-	g.wrapper.WriteHeader(code)
-}
-
-// WriteHeader implements interface gin.ResponseWriter
-func (g *ginGzipWriter) Header() http.Header {
-	return g.wrapper.Header()
-}
-
-// Flush implements http.Flusher
-func (g *ginGzipWriter) Flush() {
-	g.wrapper.Flush()
-}
-
-// Gin implement gin's middleware
-func (h *Handler) Gin(c *gin.Context) {
-	var shouldCompress = true
+// ShouldCompress decide whether or not to compress response, judging by request
+//
+// This method should only be used for building framework adaptors.
+func (h *Handler) ShouldCompress(request *http.Request) (shouldCompress bool) {
+	shouldCompress = true
 
 	for _, filter := range h.requestFilter {
-		shouldCompress = filter.ShouldCompress(c.Request)
+		shouldCompress = filter.ShouldCompress(request)
 		if !shouldCompress {
 			break
 		}
 	}
 
-	if shouldCompress {
-		wrapper := h.getWriteWrapper()
-		wrapper.Reset(c.Writer)
-		originWriter := c.Writer
-		c.Writer = &ginGzipWriter{
-			originWriter: c.Writer,
-			wrapper:      wrapper,
-		}
-		defer func() {
-			h.putWriteWrapper(wrapper)
-			c.Writer = originWriter
-		}()
-	}
-
-	c.Next()
+	return
 }
 
 // WrapHandler wraps a http.Handler, returning its gzip-enabled version
 func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var shouldCompress = true
-
-		for _, filter := range h.requestFilter {
-			shouldCompress = filter.ShouldCompress(r)
-			if !shouldCompress {
-				break
-			}
-		}
-
-		if shouldCompress {
-			wrapper := h.getWriteWrapper()
+		if h.ShouldCompress(r) {
+			wrapper := h.GetWriteWrapper()
 			wrapper.Reset(w)
 			originWriter := w
 			w = wrapper
 			defer func() {
-				h.putWriteWrapper(wrapper)
+				h.PutWriteWrapper(wrapper)
 				w = originWriter
 			}()
 		}
