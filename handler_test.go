@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -278,7 +277,7 @@ func TestGinWithDefaultHandler(t *testing.T) {
 
 			reader, err := gzip.NewReader(result.Body)
 			require.NoError(t, err)
-			body, err := ioutil.ReadAll(reader)
+			body, err := io.ReadAll(reader)
 			require.NoError(t, err)
 			require.True(t, bytes.HasPrefix(body, []byte(seq)))
 		})
@@ -306,11 +305,11 @@ func TestGinWithLevelsHandler(t *testing.T) {
 			result := w.Result()
 			require.EqualValues(t, http.StatusOK, result.StatusCode)
 			require.Equal(t, "gzip", result.Header.Get("Content-Encoding"))
-			comp, err := ioutil.ReadAll(result.Body)
+			comp, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 			reader, err := gzip.NewReader(bytes.NewReader(comp))
 			require.NoError(t, err)
-			body, err := ioutil.ReadAll(reader)
+			body, err := io.ReadAll(reader)
 			require.NoError(t, err)
 			require.True(t, bytes.HasPrefix(body, []byte(seq)))
 			t.Logf("%s: compressed %d => %d", seq, len(body), len(comp))
@@ -410,7 +409,7 @@ func TestHTTPWithDefaultHandler(t *testing.T) {
 
 			reader, err := gzip.NewReader(result.Body)
 			require.NoError(t, err)
-			body, err := ioutil.ReadAll(reader)
+			body, err := io.ReadAll(reader)
 			require.NoError(t, err)
 			require.True(t, bytes.HasPrefix(body, []byte(seq)))
 		})

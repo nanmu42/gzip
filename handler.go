@@ -3,7 +3,7 @@ package gzip
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -79,7 +79,7 @@ func NewHandler(config Config) *Handler {
 	}
 
 	handler.gzipWriterPool.New = func() interface{} {
-		writer, _ := gzip.NewWriterLevel(ioutil.Discard, handler.compressionLevel)
+		writer, _ := gzip.NewWriterLevel(io.Discard, handler.compressionLevel)
 		return writer
 	}
 	handler.wrapperPool.New = func() interface{} {
@@ -118,7 +118,7 @@ func (h *Handler) putGzipWriter(w *gzip.Writer) {
 	}
 
 	_ = w.Close()
-	w.Reset(ioutil.Discard)
+	w.Reset(io.Discard)
 	h.gzipWriterPool.Put(w)
 }
 

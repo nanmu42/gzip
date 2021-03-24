@@ -1,7 +1,7 @@
 package gzip
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -25,7 +25,7 @@ var smallPayload = []byte(`Chancellor on brink of second bailout for banks`)
 
 var gzipWriterPool = sync.Pool{
 	New: func() interface{} {
-		return gzip.NewWriter(ioutil.Discard)
+		return gzip.NewWriter(io.Discard)
 	}}
 
 func getGzipWriter() *gzip.Writer {
@@ -38,7 +38,7 @@ func putGzipWriter(w *gzip.Writer) {
 	}
 
 	_ = w.Close()
-	w.Reset(ioutil.Discard)
+	w.Reset(io.Discard)
 	gzipWriterPool.Put(w)
 }
 
@@ -165,7 +165,7 @@ func Test_writerWrapper_Write_big(t *testing.T) {
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
-	body, err := ioutil.ReadAll(reader)
+	body, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.Equal(t, bigPayload, body)
 }
@@ -215,7 +215,7 @@ func Test_writerWrapper_Write_big_part_by_part_and_reset(t *testing.T) {
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
-	body, err := ioutil.ReadAll(reader)
+	body, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.Equal(t, bigPayload, body)
 }
@@ -237,7 +237,7 @@ func Test_writerWrapper_Write_big_all_yes(t *testing.T) {
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
-	body, err := ioutil.ReadAll(reader)
+	body, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.Equal(t, bigPayload, body)
 }
@@ -299,7 +299,7 @@ func Test_writerWrapper_Write_small(t *testing.T) {
 	assert.True(t, wrapper.responseHeaderChecked)
 	assert.False(t, wrapper.bodyBigEnough)
 
-	body, err := ioutil.ReadAll(result.Body)
+	body, err := io.ReadAll(result.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, smallPayload, body)
 }
@@ -323,7 +323,7 @@ func Test_writerWrapper_Write_small_with_bigContentLength(t *testing.T) {
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
-	body, err := ioutil.ReadAll(reader)
+	body, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.Equal(t, smallPayload, body)
 
@@ -358,7 +358,7 @@ func Test_writerWrapper_Write_content_type_sniff(t *testing.T) {
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
-	_, err = ioutil.ReadAll(reader)
+	_, err = io.ReadAll(reader)
 	assert.NoError(t, err)
 }
 
@@ -385,7 +385,7 @@ func Test_writerWrapper_Write_content_type_no_sniff(t *testing.T) {
 
 	reader, err := gzip.NewReader(result.Body)
 	assert.NoError(t, err)
-	body, err := ioutil.ReadAll(reader)
+	body, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.Equal(t, bigPayload, body)
 }
