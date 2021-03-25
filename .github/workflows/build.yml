@@ -12,16 +12,16 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Get dependencies
-        run: find . -name go.mod -execdir go get \;
+        run: make dep
 
       - name: Test
-        run: find . -name go.mod -execdir go test -race -coverprofile=coverage.txt -covermode=atomic \;
+        run: make test
 
       - name: Benchmark with race detector
-        run: find . -name go.mod -execdir go test -race -benchmem -bench . \;
+        run: make benchrace
 
       - name: Benchmark
-        run: find . -name go.mod -execdir go test -benchmem -bench . \;
+        run: make bench
 
       - name: Codecov
         uses: codecov/codecov-action@v1

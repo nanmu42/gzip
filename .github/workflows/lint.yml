@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Get dependencies
-        run: find . -name go.mod -execdir go get \;
+        run: make dep
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
