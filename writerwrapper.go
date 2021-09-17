@@ -118,6 +118,7 @@ func (w *writerWrapper) Write(data []byte) (int, error) {
 	}
 
 	if !w.shouldCompress {
+		w.WriteHeaderNow()
 		return w.OriginWriter.Write(data)
 	}
 	if w.bodyBigEnough {
