@@ -389,3 +389,12 @@ func Test_writerWrapper_Write_content_type_no_sniff(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, bigPayload, body)
 }
+
+func Test_writeWrapper_does_not_change_status_code_after_204(t *testing.T) {
+	wrapper, recorder := newWrapper()
+
+	wrapper.WriteHeader(http.StatusNoContent)
+	_, _ = wrapper.Write([]byte("something"))
+
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+}
