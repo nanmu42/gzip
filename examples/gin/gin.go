@@ -41,6 +41,14 @@ func main() {
 		})
 	})
 
+	g.GET("/204", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	g.GET("/304", func(c *gin.Context) {
+		c.Status(http.StatusNotModified)
+	})
+
 	const port = 3000
 
 	log.Printf("Service is litsenning on port %d...", port)
