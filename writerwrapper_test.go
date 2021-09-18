@@ -397,4 +397,12 @@ func Test_writeWrapper_does_not_change_status_code_after_204(t *testing.T) {
 	_, _ = wrapper.Write([]byte("something"))
 
 	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	// httptest.ResponseRecorder does not deny Write when status code is 204 or 304.
+	// 	n, err := wrapper.Write([]byte("something"))
+	// 	assert.Equal(t, 0, n)
+	//	assert.Error(t, err)
+	//	assert.Equal(t, http.StatusNoContent, recorder.Code)
+	//	assert.Equal(t, []byte{}, recorder.Body.Bytes())
+	//
+	// ref: https://github.com/nanmu42/gzip/pull/5
 }
