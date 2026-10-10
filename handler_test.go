@@ -3,13 +3,16 @@ package gzip
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +20,66 @@ import (
 )
 
 const handlerTestSize = 256
+
+func TestHandler_Flush_CompressedStream(t *testing.T) {
+	for _, level := range []int{DefaultCompression, Stateless} {
+		for _, mode := range []string{"HTTP", "Gin"} {
+			t.Run(mode+"/"+strconv.Itoa(level), func(t *testing.T) {
+				h := NewHandler(Config{CompressionLevel: level, MinContentLength: minContentLength})
+				release := make(chan struct{})
+				var releaseOnce sync.Once
+				releaseStream := func() { releaseOnce.Do(func() { close(release) }) }
+				done := make(chan error, 1)
+				stream := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "text/plain")
+					if _, err := w.Write(bigPayload); err != nil {
+						done <- err
+						return
+					}
+					w.(http.Flusher).Flush()
+					w.(http.Flusher).Flush()
+					<-release
+					_, err := w.Write(smallPayload)
+					w.(http.Flusher).Flush()
+					done <- err
+				})
+				var handler http.Handler = h.WrapHandler(stream)
+				if mode == "Gin" {
+					gin.SetMode(gin.ReleaseMode)
+					g := gin.New()
+					g.Use(h.Gin)
+					g.GET("/", func(c *gin.Context) { stream.ServeHTTP(c.Writer, c.Request) })
+					handler = g
+				}
+				server := httptest.NewServer(handler)
+				defer server.Close()
+				defer releaseStream()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+				require.NoError(t, err)
+				req.Header.Set("Accept-Encoding", "gzip")
+				response, err := server.Client().Do(req)
+				require.NoError(t, err)
+				defer response.Body.Close()
+				require.Equal(t, "gzip", response.Header.Get("Content-Encoding"))
+				reader, err := gzip.NewReader(response.Body)
+				require.NoError(t, err)
+				defer reader.Close()
+				reader.Multistream(false)
+				prefix := make([]byte, len(bigPayload))
+				_, err = io.ReadFull(reader, prefix)
+				require.NoError(t, err)
+				require.Equal(t, bigPayload, prefix)
+				releaseStream()
+				tail, err := ioutil.ReadAll(reader)
+				require.NoError(t, err)
+				require.Equal(t, smallPayload, tail)
+				require.NoError(t, <-done)
+			})
+		}
+	}
+}
 
 func newGinInstance(payload []byte, middleware ...gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)

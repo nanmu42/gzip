@@ -277,7 +277,11 @@ func (w *writerWrapper) FinishWriting() {
 
 // Flush implements http.Flusher
 func (w *writerWrapper) Flush() {
-	w.FinishWriting()
+	if w.gzipWriter != nil {
+		_ = w.gzipWriter.Flush()
+	} else {
+		w.FinishWriting()
+	}
 
 	if flusher, ok := w.OriginWriter.(http.Flusher); ok {
 		flusher.Flush()

@@ -65,6 +65,48 @@ func Test_writerWrapper_Flush(t *testing.T) {
 	assert.True(t, recorder.Flushed)
 }
 
+func Test_writerWrapper_Flush_Compressed(t *testing.T) {
+	wrapper, recorder := newWrapper()
+	defer wrapper.FinishWriting()
+
+	_, err := wrapper.Write(bigPayload)
+	require.NoError(t, err)
+	wrapper.Flush()
+	wrapper.Flush()
+	require.True(t, recorder.Flushed)
+
+	_, err = wrapper.Write(smallPayload)
+	require.NoError(t, err)
+	wrapper.Flush()
+	wrapper.FinishWriting()
+
+	reader, err := gzip.NewReader(recorder.Result().Body)
+	require.NoError(t, err)
+	defer reader.Close()
+	reader.Multistream(false)
+	body, err := ioutil.ReadAll(reader)
+	require.NoError(t, err)
+	require.Equal(t, append(append([]byte(nil), bigPayload...), smallPayload...), body)
+}
+
+func Test_writerWrapper_Flush_Buffered(t *testing.T) {
+	wrapper, recorder := newWrapper()
+	defer wrapper.FinishWriting()
+
+	_, err := wrapper.Write(smallPayload)
+	require.NoError(t, err)
+	wrapper.Flush()
+	wrapper.Flush()
+
+	_, err = wrapper.Write(bigPayload)
+	require.NoError(t, err)
+	wrapper.FinishWriting()
+
+	require.True(t, recorder.Flushed)
+	require.Empty(t, recorder.Result().Header.Get("Content-Encoding"))
+	require.Equal(t, append(append([]byte(nil), smallPayload...), bigPayload...), recorder.Body.Bytes())
+}
+
 func TestNewWriterWrapper_ShouldCompress_True(t *testing.T) {
 	wrapper := newWriterWrapper(
 		nil,
